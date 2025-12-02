@@ -359,6 +359,15 @@ export default function PortfolioPage() {
 
         <div className="hero-container">
           <div className="hero-content">
+            {/* Profile Image */}
+            <div className="hero-profile">
+              <div className="profile-image-container">
+                <img src="/profile.png" alt="Anubhav Mishra" className="profile-image" />
+                <div className="profile-ring"></div>
+                <div className="profile-glow"></div>
+              </div>
+            </div>
+            
             <h1 className="hero-title">
               Hi, I&apos;m <span className="gradient-text">Anubhav Mishra</span>
             </h1>

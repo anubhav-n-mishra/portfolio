@@ -17,10 +17,15 @@ export const metadata: Metadata = {
   description: "Full-Stack Developer & Systems Engineer Portfolio - Built like a code editor",
   keywords: ["Anubhav Mishra", "Portfolio", "Developer", "Full-Stack", "Systems Engineer", "React", "Next.js"],
   authors: [{ name: "Anubhav Mishra" }],
+  icons: {
+    icon: "/profile.png",
+    apple: "/profile.png",
+  },
   openGraph: {
     title: "Anubhav Mishra | Portfolio IDE",
     description: "Full-Stack Developer & Systems Engineer Portfolio",
     type: "website",
+    images: ["/profile.png"],
   },
 };
 
@@ -31,9 +36,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💻</text></svg>" />
-      </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >

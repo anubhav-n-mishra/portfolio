@@ -4,7 +4,7 @@ export const portfolioData = {
     name: "Anubhav Mishra",
     title: "Full-Stack Developer | Systems Enthusiast | OS & Compiler Builder",
     tagline: "Meticulous and collaborative defender of data, fueled by innovation and constant learning to tackle ever-evolving cyber challenges.",
-    avatar: "https://avatars.githubusercontent.com/u/89638375?v=4",
+    avatar: "/profile.png",
     location: "India",
     education: {
       degree: "B.Tech CSE",
