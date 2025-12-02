@@ -57,16 +57,6 @@ export default function StatusBar() {
 
       {/* Right Side */}
       <div className="flex items-center h-full overflow-hidden">
-        {/* Switch View Button */}
-        <button
-          onClick={switchToSimpleView}
-          className="flex items-center gap-1 px-1.5 sm:px-2 h-full bg-[#6366f1] hover:bg-[#818cf8] cursor-pointer transition-colors text-white"
-          title="Switch to Simple Portfolio View"
-        >
-          <ArrowLeftRight size={14} />
-          <span className="hidden sm:inline text-[11px]">Switch View</span>
-        </button>
-        
         {/* Line & Column */}
         <div className="hidden md:flex px-2 h-full items-center hover:bg-white/10 cursor-pointer transition-colors whitespace-nowrap">
           Ln 1, Col 1
@@ -103,6 +93,16 @@ export default function StatusBar() {
         <div className="px-1.5 sm:px-2 h-full flex items-center hover:bg-white/10 cursor-pointer transition-colors">
           <Bell size={14} />
         </div>
+        
+        {/* Switch View Button - at the end */}
+        <button
+          onClick={switchToSimpleView}
+          className="flex items-center gap-1 px-2 h-full bg-[#6366f1] hover:bg-[#818cf8] cursor-pointer transition-colors text-white whitespace-nowrap"
+          title="Switch to Simple Portfolio View"
+        >
+          <ArrowLeftRight size={12} />
+          <span className="hidden md:inline text-[11px]">Switch View</span>
+        </button>
       </div>
     </footer>
   );
