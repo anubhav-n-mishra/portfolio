@@ -180,7 +180,7 @@ export default function TitleBar() {
         { divider: true },
         { label: 'Find', shortcut: 'Ctrl+F', action: () => {
           const search = prompt('Find:');
-          if (search) window.find(search);
+          if (search) (window as unknown as { find: (str: string) => void }).find(search);
         }},
         { label: 'Replace', shortcut: 'Ctrl+H', action: () => alert('Replace dialog') },
         { divider: true },
