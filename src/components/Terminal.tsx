@@ -85,7 +85,7 @@ export default function Terminal() {
   const renderLineContent = (content: string) => {
     // Check for __LINK__ markers
     const linkRegex = /__LINK__(.*?)__LINK__/g;
-    const parts: (string | JSX.Element)[] = [];
+    const parts: (string | React.ReactElement)[] = [];
     let lastIndex = 0;
     let match;
     
