@@ -213,7 +213,7 @@ export default function TitleBar() {
         { label: 'Toggle Sidebar', shortcut: 'Ctrl+B', action: toggleSidebar },
         { label: 'Toggle Terminal', shortcut: 'Ctrl+`', action: toggleTerminal },
         { divider: true },
-        { label: 'Toggle Theme', shortcut: 'Ctrl+K T', action: toggleTheme },
+        { label: 'Toggle Theme', shortcut: 'Ctrl+K', action: toggleTheme },
         { label: 'Zoom In', shortcut: 'Ctrl++', action: () => { document.body.style.zoom = String(parseFloat(document.body.style.zoom || '1') + 0.1); } },
         { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => { document.body.style.zoom = String(parseFloat(document.body.style.zoom || '1') - 0.1); } },
         { label: 'Reset Zoom', shortcut: 'Ctrl+0', action: () => { document.body.style.zoom = '1'; } },

@@ -76,8 +76,56 @@ export default function Terminal() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState<'terminal' | 'problems' | 'output'>('terminal');
+  const [terminals, setTerminals] = useState([{ id: 1, name: 'bash' }]);
+  const [activeTerminal, setActiveTerminal] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
+
+  // Render line content with clickable links
+  const renderLineContent = (content: string) => {
+    // Check for __LINK__ markers
+    const linkRegex = /__LINK__(.*?)__LINK__/g;
+    const parts: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = linkRegex.exec(content)) !== null) {
+      // Add text before the link
+      if (match.index > lastIndex) {
+        parts.push(content.slice(lastIndex, match.index));
+      }
+      // Add the clickable link
+      const url = match[1];
+      parts.push(
+        <a 
+          key={match.index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--accent-primary)] hover:underline cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          {url}
+        </a>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : content;
+  };
+
+  const addNewTerminal = () => {
+    const newId = Math.max(...terminals.map(t => t.id)) + 1;
+    setTerminals([...terminals, { id: newId, name: 'bash' }]);
+    setActiveTerminal(newId);
+  };
 
   useEffect(() => {
     if (outputRef.current) {
@@ -181,12 +229,24 @@ export default function Terminal() {
         return [{ type: 'success', content: 'Opening LinkedIn profile...' }];
       
       case 'resume':
+        // Check if resume extension is installed
+        const installedExts = typeof window !== 'undefined' 
+          ? (window as unknown as { installedExtensions?: string[] }).installedExtensions || []
+          : [];
+        
+        if (!installedExts.includes('resume')) {
+          return [
+            { type: 'error', content: '\n❌ Resume Download extension is not installed!' },
+            { type: 'info', content: '   To download the resume, please install the "Resume Download" extension first.' },
+            { type: 'info', content: '   Go to Extensions panel (Ctrl+Shift+X) and install it.\n' },
+          ];
+        }
         window.open('/Anubhav_Mishra.pdf', '_blank');
-        return [{ type: 'success', content: 'Opening resume PDF...' }];
+        return [{ type: 'success', content: '📄 Opening resume PDF...' }];
       
       case 'clear':
-        setLines([]);
-        return [];
+        // Return special marker to indicate clear
+        return [{ type: 'info', content: '__CLEAR__' }];
       
       case 'ls':
         return [
@@ -226,7 +286,7 @@ export default function Terminal() {
             { type: 'info', content: '\n> anubhav-portfolio@1.0.0 dev' },
             { type: 'info', content: '> next dev\n' },
             { type: 'output', content: '  ▲ Next.js 14.0.0' },
-            { type: 'output', content: '  - Local:        http://localhost:3000/portfolio' },
+            { type: 'output', content: '  - Local:        __LINK__https://mishraanubhav.me/portfolio__LINK__' },
             { type: 'output', content: '  - Environments: .env\n' },
             { type: 'success', content: '  ✓ Ready in 1.2s' },
             { type: 'info', content: '\nOpening browser...\n' },
@@ -240,7 +300,7 @@ export default function Terminal() {
             { type: 'info', content: '\n> anubhav-portfolio@1.0.0 start' },
             { type: 'info', content: '> next start\n' },
             { type: 'success', content: '  ✓ Starting production server...' },
-            { type: 'output', content: '  ✓ Ready on http://localhost:3000/portfolio' },
+            { type: 'output', content: '  ✓ Ready on __LINK__https://mishraanubhav.me/portfolio__LINK__' },
             { type: 'info', content: '\nOpening browser...\n' },
           ];
         }
@@ -378,13 +438,20 @@ export default function Terminal() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const newLines: TerminalLine[] = [
-      ...lines,
-      { type: 'input', content: `$ ${input}` },
-      ...processCommand(input),
-    ];
+    const result = processCommand(input);
+    
+    // Check if clear command was executed
+    if (result.length === 1 && result[0].content === '__CLEAR__') {
+      setLines([]);
+    } else {
+      const newLines: TerminalLine[] = [
+        ...lines,
+        { type: 'input', content: `$ ${input}` },
+        ...result,
+      ];
+      setLines(newLines);
+    }
 
-    setLines(newLines);
     setHistory([...history, input]);
     setHistoryIndex(-1);
     setInput('');
@@ -473,6 +540,7 @@ export default function Terminal() {
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           <button 
+            onClick={addNewTerminal}
             className="hidden sm:flex p-1.5 hover:bg-[var(--bg-hover)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             title="New Terminal"
           >
@@ -525,7 +593,7 @@ export default function Terminal() {
                 line.type === 'info' && "text-[var(--accent-primary)]",
               )}
             >
-              {line.content}
+              {renderLineContent(line.content)}
             </div>
           ))}
           

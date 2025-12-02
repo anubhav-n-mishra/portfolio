@@ -469,14 +469,55 @@ const GitPanel: React.FC = () => {
 
 // Extensions Panel
 const ExtensionsPanel: React.FC = () => {
+  const [installedExtensions, setInstalledExtensions] = React.useState<string[]>(['github', 'theme', 'ai']);
+  const [installingExtension, setInstallingExtension] = React.useState<string | null>(null);
+  const [installProgress, setInstallProgress] = React.useState(0);
+
   const extensions = [
-    { id: 'resume', name: 'Resume Download', description: 'Download PDF resume', installed: true, icon: '📄' },
-    { id: 'github', name: 'GitHub Integration', description: 'View GitHub activity', installed: true, icon: '🐙' },
-    { id: 'theme', name: 'Theme Switcher', description: 'Dark/Light mode', installed: true, icon: '🎨' },
-    { id: 'ai', name: 'AI Assistant', description: 'Powered by Gemini', installed: true, icon: '🤖' },
-    { id: 'contact', name: 'Contact Form', description: 'Send direct messages', installed: false, icon: '✉️' },
-    { id: 'analytics', name: 'Analytics', description: 'View portfolio stats', installed: false, icon: '📊' },
+    { id: 'resume', name: 'Resume Download', description: 'Download PDF resume directly from terminal', icon: '📄', required: true },
+    { id: 'github', name: 'GitHub Integration', description: 'View GitHub activity and stats', icon: '🐙', required: false },
+    { id: 'theme', name: 'Theme Switcher', description: 'Toggle Dark/Light mode', icon: '🎨', required: false },
+    { id: 'ai', name: 'AI Assistant', description: 'Chat powered by Gemini AI', icon: '🤖', required: false },
+    { id: 'contact', name: 'Contact Form', description: 'Send direct messages', icon: '✉️', required: false },
+    { id: 'analytics', name: 'Analytics', description: 'View portfolio statistics', icon: '📊', required: false },
+    { id: 'portfolio', name: 'Portfolio Preview', description: 'View full portfolio page', icon: '🌐', required: false },
   ];
+
+  const installExtension = (extId: string) => {
+    if (installingExtension) return;
+    
+    setInstallingExtension(extId);
+    setInstallProgress(0);
+    
+    // Simulate installation progress
+    const interval = setInterval(() => {
+      setInstallProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setInstalledExtensions(prev => [...prev, extId]);
+            setInstallingExtension(null);
+            setInstallProgress(0);
+          }, 200);
+          return 100;
+        }
+        return prev + Math.random() * 20 + 5;
+      });
+    }, 150);
+  };
+
+  const uninstallExtension = (extId: string) => {
+    setInstalledExtensions(prev => prev.filter(id => id !== extId));
+  };
+
+  const isInstalled = (extId: string) => installedExtensions.includes(extId);
+
+  // Store installed extensions in global state for terminal access
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as unknown as { installedExtensions: string[] }).installedExtensions = installedExtensions;
+    }
+  }, [installedExtensions]);
 
   return (
     <div className="flex flex-col h-full">
@@ -492,30 +533,60 @@ const ExtensionsPanel: React.FC = () => {
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-2">
-          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">INSTALLED</h4>
-          {extensions.filter(e => e.installed).map((ext) => (
-            <div key={ext.id} className="flex items-start gap-3 p-2 hover:bg-[var(--bg-hover)] rounded cursor-pointer mb-1">
-              <span className="text-xl">{ext.icon}</span>
+          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">INSTALLED ({installedExtensions.length})</h4>
+          {extensions.filter(e => isInstalled(e.id)).map((ext) => (
+            <div key={ext.id} className="flex items-start gap-3 p-2 hover:bg-[var(--bg-hover)] rounded cursor-pointer mb-1 group transition-all duration-200">
+              <span className="text-xl animate-bounce-subtle">{ext.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-[var(--text-primary)]">{ext.name}</div>
                 <div className="text-xs text-[var(--text-muted)] truncate">{ext.description}</div>
               </div>
-              <span className="text-xs text-[var(--accent-tertiary)]">✓</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[var(--accent-tertiary)]">✓ Installed</span>
+                <button 
+                  onClick={() => uninstallExtension(ext.id)}
+                  className="text-xs text-[var(--text-muted)] hover:text-[var(--error)] opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  Uninstall
+                </button>
+              </div>
             </div>
           ))}
         </div>
         <div className="px-4 py-2">
-          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">RECOMMENDED</h4>
-          {extensions.filter(e => !e.installed).map((ext) => (
-            <div key={ext.id} className="flex items-start gap-3 p-2 hover:bg-[var(--bg-hover)] rounded cursor-pointer mb-1">
+          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">AVAILABLE</h4>
+          {extensions.filter(e => !isInstalled(e.id)).map((ext) => (
+            <div key={ext.id} className="flex items-start gap-3 p-2 hover:bg-[var(--bg-hover)] rounded cursor-pointer mb-1 transition-all duration-200">
               <span className="text-xl">{ext.icon}</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-[var(--text-primary)]">{ext.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{ext.name}</span>
+                  {ext.required && (
+                    <span className="text-[10px] bg-[var(--warning)] text-black px-1.5 py-0.5 rounded">Required</span>
+                  )}
+                </div>
                 <div className="text-xs text-[var(--text-muted)] truncate">{ext.description}</div>
+                {installingExtension === ext.id && (
+                  <div className="mt-2">
+                    <div className="w-full h-1.5 bg-[var(--bg-tertiary)] rounded overflow-hidden">
+                      <div 
+                        className="h-full bg-[var(--accent-primary)] transition-all duration-150 ease-out"
+                        style={{ width: `${Math.min(installProgress, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-[var(--text-muted)]">Installing... {Math.round(installProgress)}%</span>
+                  </div>
+                )}
               </div>
-              <button className="text-xs bg-[var(--accent-primary)] text-white px-2 py-1 rounded hover:bg-[var(--accent-secondary)]">
-                Install
-              </button>
+              {installingExtension !== ext.id && (
+                <button 
+                  onClick={() => installExtension(ext.id)}
+                  className="text-xs bg-[var(--accent-primary)] text-white px-3 py-1.5 rounded hover:bg-[var(--accent-secondary)] transition-colors flex items-center gap-1"
+                >
+                  <Plus size={12} />
+                  Install
+                </button>
+              )}
             </div>
           ))}
         </div>
