@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Code2, Monitor, Smartphone, ArrowRight, Sparkles } from 'lucide-react';
+import { Code2, Monitor, Smartphone, ArrowRight, Sparkles, Terminal, FolderTree, Palette, Layout, Zap } from 'lucide-react';
 
 interface LandingPageProps {
   onSelectIDE?: () => void;
@@ -56,15 +56,15 @@ export default function LandingPage({ onSelectIDE }: LandingPageProps) {
   // Mobile loading screen
   if (isMobile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#16213e] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
         <div className="text-center px-6">
-          <Smartphone className="w-16 h-16 text-blue-500 mx-auto mb-6 animate-bounce" />
+          <Smartphone className="w-16 h-16 text-[#58a6ff] mx-auto mb-6 animate-bounce" />
           <h1 className="text-2xl font-bold text-white mb-3">Mobile Detected</h1>
-          <p className="text-gray-400 mb-6">Redirecting you to the mobile-optimized portfolio...</p>
+          <p className="text-[#8b949e] mb-6">Redirecting you to the mobile-optimized portfolio...</p>
           <div className="flex justify-center gap-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="w-2 h-2 bg-[#58a6ff] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-[#58a6ff] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-[#58a6ff] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
         </div>
       </div>
@@ -72,91 +72,96 @@ export default function LandingPage({ onSelectIDE }: LandingPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a0f] via-[#1a1a2e] to-[#16213e] flex items-center justify-center overflow-hidden relative">
-      {/* Animated background particles */}
+    <div className="min-h-screen bg-[#0d1117] flex items-center justify-center overflow-hidden relative">
+      {/* Subtle gradient orbs */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#58a6ff]/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#a371f7]/10 rounded-full blur-3xl" />
+      
+      {/* Animated stars */}
       <div className="absolute inset-0 overflow-hidden">
-        {[...Array(50)].map((_, i) => (
+        {[...Array(100)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-blue-500/30 rounded-full animate-pulse"
+            className="absolute w-[2px] h-[2px] bg-white rounded-full"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
+              opacity: Math.random() * 0.5 + 0.2,
+              animation: `twinkle ${2 + Math.random() * 3}s ease-in-out infinite`,
               animationDelay: `${Math.random() * 2}s`,
-              animationDuration: `${2 + Math.random() * 3}s`,
             }}
           />
         ))}
       </div>
 
-      {/* Grid overlay */}
-      <div 
-        className="absolute inset-0 opacity-10"
-        style={{
-          backgroundImage: `linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px',
-        }}
-      />
+      <style jsx>{`
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.2; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.2); }
+        }
+      `}</style>
 
-      <div className={`relative z-10 text-center px-6 max-w-4xl mx-auto transition-all duration-1000 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+      <div className={`relative z-10 text-center px-6 max-w-5xl mx-auto transition-all duration-1000 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
         {/* Logo */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="p-4 bg-blue-500/20 rounded-2xl backdrop-blur-sm border border-blue-500/30">
-            <Code2 className="w-12 h-12 text-blue-400" />
+        <div className="mb-6 flex items-center justify-center">
+          <div className="p-3 bg-[#21262d] rounded-xl border border-[#30363d]">
+            <Code2 className="w-10 h-10 text-[#58a6ff]" />
           </div>
         </div>
 
         {/* Title */}
-        <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight">
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Anubhav Mishra
-          </span>
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-3 tracking-tight">
+          <span className="text-white">Anubhav </span>
+          <span className="text-[#58a6ff]">Mishra</span>
         </h1>
-        <p className="text-xl text-gray-400 mb-12">Full-Stack Developer & Systems Engineer</p>
+        <p className="text-lg text-[#8b949e] mb-10">Full-Stack Developer & Systems Engineer</p>
 
         {/* Question */}
-        <div className="mb-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10 mb-6">
-            <Sparkles className="w-4 h-4 text-yellow-400" />
-            <span className="text-sm text-gray-300">Choose your experience</span>
-          </div>
-          <h2 className="text-2xl md:text-3xl font-semibold text-white">
-            Have you used an IDE before?
+        <div className="mb-8">
+          <h2 className="text-xl md:text-2xl font-medium text-[#c9d1d9]">
+            How would you like to explore my portfolio?
           </h2>
         </div>
 
         {/* Options */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
           {/* IDE Experience Option */}
           <button
             onClick={() => handleChoice('ide')}
             onMouseEnter={() => setHoveredOption('ide')}
             onMouseLeave={() => setHoveredOption(null)}
-            className={`group relative p-8 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
+            className={`group relative p-6 rounded-xl border transition-all duration-300 text-left ${
               hoveredOption === 'ide' 
-                ? 'border-blue-500 bg-blue-500/10 scale-105' 
-                : 'border-white/10 bg-white/5 hover:border-white/30'
+                ? 'border-[#58a6ff] bg-[#58a6ff]/10 scale-[1.02] shadow-lg shadow-[#58a6ff]/20' 
+                : 'border-[#30363d] bg-[#161b22] hover:border-[#58a6ff]/50'
             }`}
           >
-            {/* Glow effect */}
-            <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-blue-500/20 rounded-xl">
-                  <Monitor className="w-8 h-8 text-blue-400" />
-                </div>
-                <ArrowRight className={`w-5 h-5 text-blue-400 transition-transform duration-300 ${hoveredOption === 'ide' ? 'translate-x-2' : ''}`} />
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-lg transition-colors ${hoveredOption === 'ide' ? 'bg-[#58a6ff]/20' : 'bg-[#21262d]'}`}>
+                <Monitor className="w-6 h-6 text-[#58a6ff]" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Yes, I have!</h3>
-              <p className="text-gray-400 text-sm">
-                Experience my portfolio as a VS Code-style IDE with terminal, file explorer, and interactive features.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-300 rounded">Terminal</span>
-                <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 rounded">Extensions</span>
-                <span className="px-2 py-1 text-xs bg-green-500/20 text-green-300 rounded">File Explorer</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-lg font-semibold text-white">VS Code Experience</h3>
+                  <ArrowRight className={`w-4 h-4 text-[#58a6ff] transition-transform duration-300 ${hoveredOption === 'ide' ? 'translate-x-1' : 'opacity-0'}`} />
+                </div>
+                <p className="text-sm text-[#8b949e] mb-4">
+                  Interactive IDE with terminal, file explorer, and code editor.
+                </p>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1.5 text-[#7ee787]">
+                    <Terminal size={12} />
+                    Terminal
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[#a371f7]">
+                    <FolderTree size={12} />
+                    Explorer
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[#58a6ff]">
+                    <Zap size={12} />
+                    Extensions
+                  </span>
+                </div>
               </div>
             </div>
           </button>
@@ -166,38 +171,46 @@ export default function LandingPage({ onSelectIDE }: LandingPageProps) {
             onClick={() => handleChoice('simple')}
             onMouseEnter={() => setHoveredOption('simple')}
             onMouseLeave={() => setHoveredOption(null)}
-            className={`group relative p-8 rounded-2xl border-2 transition-all duration-300 text-left overflow-hidden ${
+            className={`group relative p-6 rounded-xl border transition-all duration-300 text-left ${
               hoveredOption === 'simple' 
-                ? 'border-purple-500 bg-purple-500/10 scale-105' 
-                : 'border-white/10 bg-white/5 hover:border-white/30'
+                ? 'border-[#a371f7] bg-[#a371f7]/10 scale-[1.02] shadow-lg shadow-[#a371f7]/20' 
+                : 'border-[#30363d] bg-[#161b22] hover:border-[#a371f7]/50'
             }`}
           >
-            {/* Glow effect */}
-            <div className={`absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 bg-purple-500/20 rounded-xl">
-                  <Sparkles className="w-8 h-8 text-purple-400" />
-                </div>
-                <ArrowRight className={`w-5 h-5 text-purple-400 transition-transform duration-300 ${hoveredOption === 'simple' ? 'translate-x-2' : ''}`} />
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-lg transition-colors ${hoveredOption === 'simple' ? 'bg-[#a371f7]/20' : 'bg-[#21262d]'}`}>
+                <Layout className="w-6 h-6 text-[#a371f7]" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">No, show me simple view</h3>
-              <p className="text-gray-400 text-sm">
-                View a beautiful, animated portfolio with smooth scrolling and modern design.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="px-2 py-1 text-xs bg-purple-500/20 text-purple-300 rounded">Animations</span>
-                <span className="px-2 py-1 text-xs bg-pink-500/20 text-pink-300 rounded">Easy Navigation</span>
-                <span className="px-2 py-1 text-xs bg-orange-500/20 text-orange-300 rounded">Mobile Friendly</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-lg font-semibold text-white">Classic Portfolio</h3>
+                  <ArrowRight className={`w-4 h-4 text-[#a371f7] transition-transform duration-300 ${hoveredOption === 'simple' ? 'translate-x-1' : 'opacity-0'}`} />
+                </div>
+                <p className="text-sm text-[#8b949e] mb-4">
+                  Beautiful animated portfolio with smooth scrolling sections.
+                </p>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1.5 text-[#f778ba]">
+                    <Sparkles size={12} />
+                    Animations
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[#ffa657]">
+                    <Palette size={12} />
+                    Modern UI
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[#79c0ff]">
+                    <Smartphone size={12} />
+                    Responsive
+                  </span>
+                </div>
               </div>
             </div>
           </button>
         </div>
 
-        {/* Skip text */}
-        <p className="mt-8 text-sm text-gray-500">
-          Your choice will be remembered for future visits
+        {/* Footer text */}
+        <p className="mt-6 text-xs text-[#484f58]">
+          You can switch between views anytime
         </p>
       </div>
     </div>
