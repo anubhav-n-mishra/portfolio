@@ -13,18 +13,34 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Anubhav Mishra | Portfolio IDE",
-  description: "Full-Stack Developer & Systems Engineer Portfolio - Built like a code editor",
-  keywords: ["Anubhav Mishra", "Portfolio", "Developer", "Full-Stack", "Systems Engineer", "React", "Next.js"],
+  metadataBase: new URL("https://mishraanubhav.me"),
+  title: "Anubhav Mishra | Portfolio",
+  description: "Full-Stack Developer & Systems Engineer | AI/ML • Cloud Computing • DBMS • SQL • Cybersecurity",
+  keywords: ["Anubhav Mishra", "Portfolio", "Developer", "Full-Stack", "Systems Engineer", "React", "Next.js", "AI/ML", "Cloud Computing", "Cybersecurity"],
   authors: [{ name: "Anubhav Mishra" }],
   icons: {
     icon: "/profile.png",
     apple: "/profile.png",
   },
   openGraph: {
-    title: "Anubhav Mishra | Portfolio IDE",
-    description: "Full-Stack Developer & Systems Engineer Portfolio",
+    title: "Anubhav Mishra | Portfolio",
+    description: "Full-Stack Developer & Systems Engineer | AI/ML • Cloud Computing • DBMS • SQL • Cybersecurity",
+    url: "https://mishraanubhav.me",
+    siteName: "Anubhav Mishra Portfolio",
     type: "website",
+    images: [
+      {
+        url: "/profile.png",
+        width: 400,
+        height: 400,
+        alt: "Anubhav Mishra Portfolio",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Anubhav Mishra | Portfolio",
+    description: "Full-Stack Developer & Systems Engineer | AI/ML • Cloud Computing • DBMS • SQL • Cybersecurity",
     images: ["/profile.png"],
   },
 };
