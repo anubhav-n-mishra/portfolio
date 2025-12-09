@@ -110,7 +110,6 @@ body {
     background: var(--bg-primary);
     color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
-<<<<<<< HEAD
 }
 
 /* Defensive override when IDE is active - prevents portfolio contamination */
@@ -125,8 +124,6 @@ body[data-ide-active="true"] {
 html:has(body[data-ide-active="true"]) {
     overflow: hidden !important;
     height: 100vh !important;
-=======
->>>>>>> beb9c06b589a8323ac5bd3322ddad3d94f3a8945
 }
 
 /* Scrollbar Styling */

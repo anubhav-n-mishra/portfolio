@@ -14,184 +14,114 @@ import SimpleBrowser from '@/components/SimpleBrowser';
 import { cn } from '@/lib/utils';
 
 export default function IDELayout() {
-    const { theme, antiGravity, animations, toggleTheme } = useThemeStore();
-    const { toggleSidebar, toggleTerminal, sidebarOpen, simpleBrowserOpen } = useEditorStore();
-    const [mounted, setMounted] = useState(false);
-    const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isMobile, setIsMobile] = useState(false);
+  const { theme, antiGravity, animations, toggleTheme } = useThemeStore();
+  const { toggleSidebar, toggleTerminal, sidebarOpen, simpleBrowserOpen } = useEditorStore();
+  const [mounted, setMounted] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
-    useEffect(() => {
-        setMounted(true);
+  useEffect(() => {
+    setMounted(true);
 
-        // Force scroll to top and lock body scroll for IDE experience
-        window.scrollTo(0, 0);
+    // Force scroll to top and lock body scroll for IDE experience
+    window.scrollTo(0, 0);
 
-        // Aggressive cleanup of portfolio contamination
-        document.documentElement.removeAttribute('data-theme');
-        document.body.removeAttribute('data-theme');
+    // Aggressive cleanup of portfolio contamination
+    document.documentElement.removeAttribute('data-theme');
+    document.body.removeAttribute('data-theme');
 
-        // Remove portfolio-specific classes
-        const bodyClasses = document.body.className.split(' ').filter(cls => !cls.includes('portfolio'));
-        document.body.className = bodyClasses.join(' ');
+    // Remove portfolio-specific classes
+    const bodyClasses = document.body.className.split(' ').filter(cls => !cls.includes('portfolio'));
+    document.body.className = bodyClasses.join(' ');
 
-        // Set IDE-specific attribute for CSS isolation
-        document.body.setAttribute('data-ide-active', 'true');
+    // Set IDE-specific attribute for CSS isolation
+    document.body.setAttribute('data-ide-active', 'true');
 
-        // Lock scroll
-        document.body.style.overflow = 'hidden';
-        document.documentElement.style.overflow = 'hidden';
+    // Lock scroll
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
 
-        // Force scroll restoration to manual
-        if ('scrollRestoration' in history) {
-            history.scrollRestoration = 'manual';
-        }
-
-        // Check screen size
-        const checkMobile = () => setIsMobile(window.innerWidth < 768);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-
-        // Quick loading simulation
-        const timer = setTimeout(() => setIsLoading(false), 800);
-
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener('resize', checkMobile);
-            // Clean up styles and attributes
-            document.body.style.overflow = '';
-            document.documentElement.style.overflow = '';
-            document.body.removeAttribute('data-ide-active');
-        };
-    }, []);
-
-    // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Command Palette: Ctrl+Shift+P or Ctrl+P
-            if ((e.ctrlKey && e.shiftKey && e.key === 'P') || (e.ctrlKey && e.key === 'p')) {
-                e.preventDefault();
-                setCommandPaletteOpen(true);
-            }
-            // Toggle Theme: Ctrl+K
-            if (e.ctrlKey && e.key === 'k') {
-                e.preventDefault();
-                toggleTheme();
-            }
-            // Toggle Sidebar: Ctrl+B
-            if (e.ctrlKey && e.key === 'b') {
-                e.preventDefault();
-                toggleSidebar();
-            }
-            // Toggle Terminal: Ctrl+`
-            if (e.ctrlKey && e.key === '`') {
-                e.preventDefault();
-                toggleTerminal();
-            }
-            // Close Command Palette: Escape
-            if (e.key === 'Escape') {
-                setCommandPaletteOpen(false);
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [toggleTheme, toggleSidebar, toggleTerminal]);
-
-    if (!mounted) {
-        return null;
+    // Force scroll restoration to manual
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
     }
 
-    // Loading screen
-    if (isLoading) {
-        return (
-            <div className={cn("h-screen w-screen flex items-center justify-center", theme === 'light' && 'light')} style={{ background: 'var(--bg-primary)' }}>
-                <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 text-4xl mb-6" style={{ color: 'var(--accent-primary)' }}>
-                        <span className="animate-pulse">{`{`}</span>
-                        <div className="flex gap-1">
-                            <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
-                            <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
-                            <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
-                        </div>
-                        <span className="animate-pulse">{`}`}</span>
-                    </div>
-                    <p className="font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>Initializing Anubhav&apos;s IDE...</p>
-                </div>
-            </div>
-        );
-    }
+    // Check screen size
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
 
+    // Quick loading simulation
+    const timer = setTimeout(() => setIsLoading(false), 800);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', checkMobile);
+      // Clean up styles and attributes
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.removeAttribute('data-ide-active');
+    };
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Command Palette: Ctrl+Shift+P or Ctrl+P
+      if ((e.ctrlKey && e.shiftKey && e.key === 'P') || (e.ctrlKey && e.key === 'p')) {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+      // Toggle Theme: Ctrl+K
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        toggleTheme();
+      }
+      // Toggle Sidebar: Ctrl+B
+      if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+      // Toggle Terminal: Ctrl+`
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        toggleTerminal();
+      }
+      // Close Command Palette: Escape
+      if (e.key === 'Escape') {
+        setCommandPaletteOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleTheme, toggleSidebar, toggleTerminal]);
+
+  if (!mounted) {
+    return null;
+  }
+
+  // Loading screen
+  if (isLoading) {
     return (
-        <div
-            className={cn(
-                "h-screen w-screen flex flex-col overflow-hidden",
-                theme === 'light' && 'light',
-                antiGravity && 'antigravity-enabled',
-                animations && 'theme-transition'
-            )}
-            style={{ background: 'var(--bg-primary)' }}
-        >
-            {/* Title Bar */}
-            <TitleBar />
-
-<<<<<<< HEAD
-            {/* Main Content */}
-            <main className="flex-1 flex overflow-hidden min-h-0">
-                {/* Activity Bar */}
-                <ActivityBar />
-
-                {/* Sidebar */}
-                {sidebarOpen && (
-                    <>
-                        {isMobile && (
-                            <div
-                                className="fixed inset-0 bg-black/50 z-30"
-                                style={{ top: '35px', bottom: '22px' }}
-                                onClick={toggleSidebar}
-                            />
-                        )}
-                        <div className={cn(
-                            isMobile && "fixed left-12 top-[35px] bottom-[22px] z-40 shadow-xl"
-                        )}>
-                            <Sidebar />
-                        </div>
-                    </>
-                )}
-
-                {/* Editor + Terminal Area */}
-                <div className="flex-1 flex flex-col min-w-0 min-h-0">
-                    <div className="flex-1 flex min-h-0 flex-col md:flex-row">
-                        <div className={cn(
-                            "flex-1 flex flex-col min-w-0",
-                            simpleBrowserOpen && !isMobile && "md:w-1/2"
-                        )}>
-                            <Editor />
-                        </div>
-                        {simpleBrowserOpen && (
-                            <div className={cn(
-                                "border-t md:border-t-0 md:border-l",
-                                isMobile ? "h-1/2" : "w-1/2"
-                            )} style={{ borderColor: 'var(--border-primary)' }}>
-                                <SimpleBrowser />
-                            </div>
-                        )}
-                    </div>
-                    <Terminal />
-                </div>
-            </main>
-
-            {/* Status Bar */}
-            <StatusBar />
-
-            {/* Command Palette Modal */}
-            <CommandPalette
-                isOpen={commandPaletteOpen}
-                onClose={() => setCommandPaletteOpen(false)}
-            />
+      <div className={cn("h-screen w-screen flex items-center justify-center", theme === 'light' && 'light')} style={{ background: 'var(--bg-primary)' }}>
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2 text-4xl mb-6" style={{ color: 'var(--accent-primary)' }}>
+            <span className="animate-pulse">{`{`}</span>
+            <div className="flex gap-1">
+              <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
+              <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
+              <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
+            </div>
+            <span className="animate-pulse">{`}`}</span>
+          </div>
+          <p className="font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>Initializing Anubhav&apos;s IDE...</p>
         </div>
+      </div>
     );
-=======
+  }
+
   return (
     <div
       className={cn(
@@ -260,5 +190,4 @@ export default function IDELayout() {
       />
     </div>
   );
->>>>>>> beb9c06b589a8323ac5bd3322ddad3d94f3a8945
 }
