@@ -450,3 +450,33 @@ select:focus {
 .animate-slide-in-up {
     animation: slideInUp 0.3s ease-out;
 }
+/* ------------------------------------------------------------------ *
+ * Tokenised syntax highlighting (src/lib/highlight.ts)
+ * These replace the old .token-* classes, which were applied by injecting
+ * an HTML string; these are real elements with escaped text content.
+ * ------------------------------------------------------------------ */
+.tok-keyword  { color: var(--syntax-keyword); }
+.tok-string   { color: var(--syntax-string); }
+.tok-number   { color: var(--syntax-number); }
+.tok-function { color: var(--syntax-function); }
+.tok-comment  { color: var(--syntax-comment); font-style: italic; }
+.tok-type     { color: var(--syntax-type); }
+.tok-property { color: var(--syntax-property); }
+.tok-variable { color: var(--syntax-variable); }
+.tok-heading  { color: var(--syntax-function); font-weight: 700; }
+.tok-strong   { color: var(--text-primary); font-weight: 700; }
+.tok-link     { color: var(--accent-secondary); text-decoration: underline; }
+
+/* Terminal stream colours */
+.stream-stdout  { color: var(--text-primary); }
+.stream-stderr  { color: var(--error); }
+.stream-info    { color: var(--accent-primary); }
+.stream-success { color: var(--success); }
+.stream-input   { color: var(--text-secondary); }
+
+/* The editor's transparent textarea must not paint its own selection colour
+   over the highlight layer underneath it. */
+.editor-surface textarea::selection {
+    background: var(--bg-selected);
+    color: transparent;
+}

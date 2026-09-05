@@ -1,660 +1,680 @@
 'use client';
 
 import React from 'react';
-import { useEditorStore, TreeNode } from '@/store/editor';
-import { cn } from '@/lib/utils';
 import {
-  ChevronRight,
-  ChevronDown,
-  Folder,
-  FolderOpen,
-  FileText,
-  FileJson,
-  FileCode,
-  Database,
-  FileType,
-  Plus,
-  FoldVertical,
-  RefreshCw,
-  Search,
-  GitBranch,
-  GitCommit,
-  ExternalLink,
-  Github,
-  Linkedin,
-  Mail,
-  MoreHorizontal,
-  Ellipsis,
-} from 'lucide-react';
+  useEditorStore, type TreeNode, EXTENSIONS, installExtension, uninstallExtension,
+} from '@/store/editor';
+import { useThemeStore } from '@/store/theme';
+import { useRunnerStore } from '@/store/runner';
 import { portfolioData } from '@/data/portfolio';
+import { ask, SUGGESTED_QUESTIONS, type Answer } from '@/lib/assistant';
+import { languageFor } from '@/lib/runtime';
+import { cn } from '@/lib/utils';
+import FileIcon from './FileIcon';
+import { useIsMobile } from '@/lib/hooks';
+import { pickFiles } from '@/lib/pickFiles';
+import {
+  ChevronRight, ChevronDown, Folder, FolderOpen, FilePlus, FolderPlus, RefreshCw,
+  FoldVertical, Search, GitBranch, Github, Linkedin, Mail, Globe, Play, Send,
+  Ellipsis, Check, Trash2, ExternalLink, Star, Bot, MapPin,
+} from 'lucide-react';
 
-const FileIcon: React.FC<{ filename: string; className?: string }> = ({ filename, className }) => {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  
-  const iconMap: Record<string, { icon: React.ElementType; color: string }> = {
-    'md': { icon: FileText, color: '#519aba' },
-    'json': { icon: FileJson, color: '#cbcb41' },
-    'ts': { icon: FileCode, color: '#3178c6' },
-    'tsx': { icon: FileCode, color: '#61dafb' },
-    'js': { icon: FileCode, color: '#f7df1e' },
-    'jsx': { icon: FileCode, color: '#61dafb' },
-    'yaml': { icon: FileType, color: '#cb171e' },
-    'yml': { icon: FileType, color: '#cb171e' },
-    'sql': { icon: Database, color: '#e48e00' },
-    'css': { icon: FileCode, color: '#563d7c' },
-  };
+/* ================================================================== *
+ * Explorer
+ * ================================================================== */
 
-  const iconInfo = iconMap[ext || ''] || { icon: FileText, color: '#6d8086' };
-  const Icon = iconInfo.icon;
-  
-  return <Icon size={16} className={className} style={{ color: iconInfo.color }} />;
-};
-
-const TreeItemComponent: React.FC<{ node: TreeNode; depth?: number }> = ({ node, depth = 0 }) => {
+const TreeItem: React.FC<{ node: TreeNode; depth: number }> = ({ node, depth }) => {
   const { openFile, toggleFolder, activeFile } = useEditorStore();
   const isActive = node.type === 'file' && node.name === activeFile;
-
-  const handleClick = () => {
-    if (node.type === 'folder') {
-      toggleFolder(node.path);
-    } else {
-      openFile(node.name);
-    }
-  };
+  const spec = node.type === 'file' ? languageFor(node.name) : null;
 
   return (
     <div>
       <div
-        onClick={handleClick}
-        className={cn(
-          "flex items-center gap-1 py-[2px] cursor-pointer hover:bg-[var(--bg-hover)] text-[13px] text-[var(--text-primary)]",
-          isActive && "bg-[var(--bg-selected)]"
-        )}
-        style={{ paddingLeft: `${depth * 8 + 8}px` }}
+        onClick={() => (node.type === 'folder' ? toggleFolder(node.path) : openFile(node.name))}
+        className="flex items-center gap-1 py-[3px] cursor-pointer text-[13px] group"
+        style={{
+          paddingLeft: `${depth * 10 + 8}px`,
+          background: isActive ? 'var(--bg-selected)' : undefined,
+          color: 'var(--text-primary)',
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) e.currentTarget.style.background = '';
+        }}
       >
         {node.type === 'folder' ? (
           <>
+            {node.isOpen ? <ChevronDown size={15} className="shrink-0" /> : <ChevronRight size={15} className="shrink-0" />}
             {node.isOpen ? (
-              <ChevronDown size={16} className="text-[var(--text-muted)] shrink-0" />
+              <FolderOpen size={15} className="shrink-0 mr-1" style={{ color: 'var(--folder-color)' }} />
             ) : (
-              <ChevronRight size={16} className="text-[var(--text-muted)] shrink-0" />
-            )}
-            {node.isOpen ? (
-              <FolderOpen size={16} className="shrink-0 mr-1" style={{ color: '#dcb67a' }} />
-            ) : (
-              <Folder size={16} className="shrink-0 mr-1" style={{ color: '#dcb67a' }} />
+              <Folder size={15} className="shrink-0 mr-1" style={{ color: 'var(--folder-color)' }} />
             )}
           </>
         ) : (
           <>
-            <span className="w-4 shrink-0" />
-            <FileIcon filename={node.name} className="shrink-0 mr-1" />
+            <span className="w-[15px] shrink-0" />
+            <FileIcon filename={node.name} size={15} className="shrink-0 mr-1" />
           </>
         )}
         <span className="truncate">{node.name}</span>
+        {spec && (
+          <Play
+            size={10}
+            className="ml-auto mr-2 shrink-0 opacity-0 group-hover:opacity-70"
+            style={{ color: 'var(--success)' }}
+          />
+        )}
       </div>
-      {node.type === 'folder' && node.isOpen && node.children && (
-        <div>
-          {node.children.map((child) => (
-            <TreeItemComponent key={child.id} node={child} depth={depth + 1} />
-          ))}
-        </div>
-      )}
+      {node.type === 'folder' &&
+        node.isOpen &&
+        node.children?.map((child) => <TreeItem key={child.id} node={child} depth={depth + 1} />)}
     </div>
   );
 };
 
-// Explorer Panel - VS Code style
+const PanelHeader: React.FC<{ title: string; children?: React.ReactNode }> = ({ title, children }) => (
+  <div
+    className="flex items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-wide shrink-0"
+    style={{ color: 'var(--text-secondary)' }}
+  >
+    <span>{title}</span>
+    <div className="flex gap-0.5">{children}</div>
+  </div>
+);
+
+const IconButton: React.FC<{ title: string; onClick: () => void; children: React.ReactNode }> = ({
+  title, onClick, children,
+}) => (
+  <button
+    onClick={onClick}
+    title={title}
+    aria-label={title}
+    className="p-1 rounded opacity-70 hover:opacity-100 hover:bg-[var(--bg-hover)]"
+  >
+    {children}
+  </button>
+);
+
 const ExplorerPanel: React.FC = () => {
-  const { fileTree, createFile, createFolder, openFile } = useEditorStore();
-  const [isProjectOpen, setIsProjectOpen] = React.useState(true);
-  const [isOutlineOpen, setIsOutlineOpen] = React.useState(false);
-  const [isTimelineOpen, setIsTimelineOpen] = React.useState(false);
-  const [showNewFileInput, setShowNewFileInput] = React.useState(false);
-  const [showNewFolderInput, setShowNewFolderInput] = React.useState(false);
-  const [newFileName, setNewFileName] = React.useState('');
-  const [newFolderName, setNewFolderName] = React.useState('');
-  const newFileInputRef = React.useRef<HTMLInputElement>(null);
-  const newFolderInputRef = React.useRef<HTMLInputElement>(null);
-  const fileUploadRef = React.useRef<HTMLInputElement>(null);
-  const folderUploadRef = React.useRef<HTMLInputElement>(null);
+  const { fileTree, createFile, createFolder, openFile, collapseAllFolders } = useEditorStore();
+  const [creating, setCreating] = React.useState<'file' | 'folder' | null>(null);
+  const [draft, setDraft] = React.useState('');
+  const [spin, setSpin] = React.useState(false);
 
-  React.useEffect(() => {
-    if (showNewFileInput && newFileInputRef.current) {
-      newFileInputRef.current.focus();
-    }
-    if (showNewFolderInput && newFolderInputRef.current) {
-      newFolderInputRef.current.focus();
-    }
-  }, [showNewFileInput, showNewFolderInput]);
-
-  const handleNewFile = () => {
-    setShowNewFileInput(true);
-    setShowNewFolderInput(false);
-  };
-
-  const handleNewFolder = () => {
-    setShowNewFolderInput(true);
-    setShowNewFileInput(false);
-  };
-
-  const handleNewFileSubmit = (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newFileName.trim()) {
-      createFile('/src', newFileName.trim());
-      openFile(newFileName.trim());
-      setNewFileName('');
-      setShowNewFileInput(false);
+    const name = draft.trim();
+    if (!name) {
+      setCreating(null);
+      return;
     }
-  };
-
-  const handleNewFolderSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newFolderName.trim()) {
-      createFolder('/src', newFolderName.trim());
-      setNewFolderName('');
-      setShowNewFolderInput(false);
+    if (creating === 'file') {
+      createFile('/playground', name);
+      openFile(name);
+    } else {
+      createFolder('/playground', name);
     }
+    setDraft('');
+    setCreating(null);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result as string;
-          createFile('/src', file.name);
-          setTimeout(() => {
-            useEditorStore.getState().updateFileContent(file.name, content);
-            openFile(file.name);
-          }, 100);
-        };
-        reader.readAsText(file);
-      });
-    }
-    if (fileUploadRef.current) fileUploadRef.current.value = '';
-  };
-
-  const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      // Get folder name from first file path
-      const firstPath = files[0].webkitRelativePath;
-      const folderName = firstPath.split('/')[0];
-      createFolder('/src', folderName);
-      
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result as string;
-          createFile(`/src/${folderName}`, file.name);
-          setTimeout(() => {
-            useEditorStore.getState().updateFileContent(file.name, content);
-          }, 100);
-        };
-        reader.readAsText(file);
-      });
-      openFile(files[0].name);
-    }
-    if (folderUploadRef.current) folderUploadRef.current.value = '';
-  };
-
-  const handleNewFileKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setShowNewFileInput(false);
-      setNewFileName('');
-    }
-  };
-
-  const handleNewFolderKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setShowNewFolderInput(false);
-      setNewFolderName('');
-    }
-  };
-
-  const collapseAll = () => {
-    const collapseInTree = (nodes: TreeNode[]): TreeNode[] => {
-      return nodes.map(node => {
-        if (node.type === 'folder' && node.name !== 'anubhav-portfolio') {
-          return { ...node, isOpen: false, children: node.children ? collapseInTree(node.children) : undefined };
-        }
-        if (node.children) {
-          return { ...node, children: collapseInTree(node.children) };
-        }
-        return node;
-      });
-    };
-    useEditorStore.setState((state) => ({ fileTree: collapseInTree(state.fileTree) }));
-  };
-
-  const refreshTree = () => {
-    // Simulate refresh - just toggle to show feedback
-    setIsProjectOpen(false);
-    setTimeout(() => setIsProjectOpen(true), 100);
+  const upload = async () => {
+    const loaded = await pickFiles();
+    loaded.forEach(({ name, content }) => createFile('/playground', name, content));
+    if (loaded[0]) openFile(loaded[0].name);
   };
 
   return (
-    <div className="flex flex-col h-full text-[var(--text-primary)]">
-      {/* Explorer Header */}
-      <div className="flex items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] shrink-0">
-        <span>Explorer</span>
-        <button className="p-0.5 hover:bg-[var(--bg-hover)] rounded opacity-60 hover:opacity-100">
-          <Ellipsis size={16} />
-        </button>
-      </div>
-      
-      {/* Scrollable Content */}
+    <div className="flex flex-col h-full" style={{ color: 'var(--text-primary)' }}>
+      <PanelHeader title="Explorer">
+        <IconButton title="New file" onClick={() => { setCreating('file'); setDraft(''); }}>
+          <FilePlus size={15} />
+        </IconButton>
+        <IconButton title="New folder" onClick={() => { setCreating('folder'); setDraft(''); }}>
+          <FolderPlus size={15} />
+        </IconButton>
+        <IconButton title="Open a file from your computer" onClick={upload}>
+          <Ellipsis size={15} />
+        </IconButton>
+        <IconButton
+          title="Refresh"
+          onClick={() => {
+            setSpin(true);
+            window.setTimeout(() => setSpin(false), 500);
+          }}
+        >
+          <RefreshCw size={15} className={spin ? 'animate-spin' : ''} />
+        </IconButton>
+        <IconButton title="Collapse folders" onClick={collapseAllFolders}>
+          <FoldVertical size={15} />
+        </IconButton>
+      </PanelHeader>
+
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        {/* Project Section Header */}
-        <div 
-          className="flex items-center justify-between px-2 py-[5px] cursor-pointer hover:bg-[var(--bg-hover)] select-none sticky top-0 bg-[var(--bg-sidebar)] z-10"
-          onClick={() => setIsProjectOpen(!isProjectOpen)}
+        <div
+          className="px-2 py-[5px] text-[11px] font-semibold uppercase tracking-wide sticky top-0 z-10"
+          style={{ background: 'var(--bg-sidebar)' }}
         >
-          <div className="flex items-center gap-0.5 min-w-0">
-            {isProjectOpen ? <ChevronDown size={18} className="shrink-0" /> : <ChevronRight size={18} className="shrink-0" />}
-            <span className="text-[11px] font-semibold uppercase tracking-wide truncate">ANUBHAV-PORTFOLIO</span>
-          </div>
-          {isProjectOpen && (
-            <div className="flex gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-              <button 
-                onClick={handleNewFile}
-                className="p-0.5 hover:bg-[var(--bg-tertiary)] rounded opacity-60 hover:opacity-100" 
-                title="New File"
-              >
-                <Plus size={16} />
-              </button>
-              <button 
-                onClick={handleNewFolder}
-                className="p-0.5 hover:bg-[var(--bg-tertiary)] rounded opacity-60 hover:opacity-100" 
-                title="New Folder"
-              >
-                <FoldVertical size={16} />
-              </button>
-              <button 
-                onClick={refreshTree}
-                className="p-0.5 hover:bg-[var(--bg-tertiary)] rounded opacity-60 hover:opacity-100" 
-                title="Refresh"
-              >
-                <RefreshCw size={16} />
-              </button>
-              <button 
-                onClick={collapseAll}
-                className="p-0.5 hover:bg-[var(--bg-tertiary)] rounded opacity-60 hover:opacity-100" 
-                title="Collapse All"
-              >
-                <FoldVertical size={16} />
-              </button>
-            </div>
-          )}
+          anubhav-portfolio
         </div>
-        
-        {/* File Tree */}
-        {isProjectOpen && (
-          <div className="text-[13px]">
-            {/* Hidden File Inputs */}
-            <input 
-              type="file" 
-              ref={fileUploadRef} 
-              className="hidden" 
-              onChange={handleFileUpload}
-              multiple
-              accept=".js,.jsx,.ts,.tsx,.json,.md,.css,.html,.py,.sql,.yaml,.yml,.txt"
+
+        {creating && (
+          <form onSubmit={submit} className="px-6 py-1">
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={submit}
+              onKeyDown={(e) => e.key === 'Escape' && setCreating(null)}
+              placeholder={creating === 'file' ? 'solution.py' : 'folder-name'}
+              className="w-full px-2 py-1 text-[13px] rounded outline-none"
+              style={{
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--accent-primary)',
+                color: 'var(--text-primary)',
+              }}
             />
-            <input 
-              type="file" 
-              ref={folderUploadRef} 
-              className="hidden" 
-              onChange={handleFolderUpload}
-              multiple
-            />
-            
-            {/* New File Input */}
-            {showNewFileInput && (
-              <form onSubmit={handleNewFileSubmit} className="px-6 py-1">
-                <input
-                  ref={newFileInputRef}
-                  type="text"
-                  value={newFileName}
-                  onChange={(e) => setNewFileName(e.target.value)}
-                  onKeyDown={handleNewFileKeyDown}
-                  onBlur={() => {
-                    if (!newFileName.trim()) {
-                      setShowNewFileInput(false);
-                    }
-                  }}
-                  placeholder="filename.js"
-                  className="w-full px-2 py-1 text-[13px] bg-[var(--bg-tertiary)] border border-[var(--accent-primary)] rounded outline-none text-[var(--text-primary)]"
-                />
-              </form>
-            )}
-            
-            {/* New Folder Input */}
-            {showNewFolderInput && (
-              <form onSubmit={handleNewFolderSubmit} className="px-6 py-1">
-                <input
-                  ref={newFolderInputRef}
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyDown={handleNewFolderKeyDown}
-                  onBlur={() => {
-                    if (!newFolderName.trim()) {
-                      setShowNewFolderInput(false);
-                    }
-                  }}
-                  placeholder="folder-name"
-                  className="w-full px-2 py-1 text-[13px] bg-[var(--bg-tertiary)] border border-[var(--accent-primary)] rounded outline-none text-[var(--text-primary)]"
-                />
-              </form>
-            )}
-            
-            {fileTree[0]?.children?.map((node) => (
-              <TreeItemComponent key={node.id} node={node} depth={0} />
-            ))}
-          </div>
+          </form>
         )}
 
-        {/* Outline Section */}
-        <div 
-          className="flex items-center gap-0.5 px-2 py-[5px] cursor-pointer hover:bg-[var(--bg-hover)] select-none sticky top-0 bg-[var(--bg-sidebar)] z-10 mt-1"
-          onClick={() => setIsOutlineOpen(!isOutlineOpen)}
-        >
-          {isOutlineOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-          <span className="text-[11px] font-semibold uppercase tracking-wide">OUTLINE</span>
-        </div>
-        {isOutlineOpen && (
-          <div className="px-6 py-2 text-[var(--text-muted)] text-[12px]">
-            No symbols found in &apos;README.md&apos;
-          </div>
-        )}
+        {fileTree[0]?.children?.map((node) => <TreeItem key={node.id} node={node} depth={0} />)}
 
-        {/* Timeline Section */}
-        <div 
-          className="flex items-center gap-0.5 px-2 py-[5px] cursor-pointer hover:bg-[var(--bg-hover)] select-none sticky top-0 bg-[var(--bg-sidebar)] z-10"
-          onClick={() => setIsTimelineOpen(!isTimelineOpen)}
-        >
-          {isTimelineOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-          <span className="text-[11px] font-semibold uppercase tracking-wide">TIMELINE</span>
+        <div className="px-4 py-4 mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Files in <span style={{ color: 'var(--text-secondary)' }}>playground/</span> run for real.
+          Open one and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>. You can add your own too.
         </div>
-        {isTimelineOpen && (
-          <div className="px-6 py-2 text-[var(--text-muted)] text-[12px]">
-            Timeline: README.md
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
-// Search Panel
+/* ================================================================== *
+ * Search — actually searches
+ * ================================================================== */
+
+interface Hit {
+  file: string;
+  line: number;
+  text: string;
+}
+
 const SearchPanel: React.FC = () => {
+  const { allFilenames, contentOf, openFile } = useEditorStore();
   const [query, setQuery] = React.useState('');
+  const [caseSensitive, setCaseSensitive] = React.useState(false);
+
+  const hits = React.useMemo<Hit[]>(() => {
+    const q = query.trim();
+    if (q.length < 2) return [];
+    const needle = caseSensitive ? q : q.toLowerCase();
+    const found: Hit[] = [];
+
+    for (const file of allFilenames()) {
+      const lines = contentOf(file).split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const hay = caseSensitive ? lines[i] : lines[i].toLowerCase();
+        if (hay.includes(needle)) {
+          found.push({ file, line: i + 1, text: lines[i].trim().slice(0, 160) });
+          if (found.length >= 120) return found;
+        }
+      }
+    }
+    return found;
+  }, [query, caseSensitive, allFilenames, contentOf]);
+
+  const grouped = React.useMemo(() => {
+    const map = new Map<string, Hit[]>();
+    for (const hit of hits) {
+      const list = map.get(hit.file) ?? [];
+      list.push(hit);
+      map.set(hit.file, list);
+    }
+    return [...map.entries()];
+  }, [hits]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-[var(--border-color)]">
-        <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wider">SEARCH</span>
-      </div>
-      <div className="p-3">
-        <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] rounded px-3 py-2 border border-[var(--border-color)] focus-within:border-[var(--accent-primary)]">
-          <Search size={14} className="text-[var(--text-muted)]" />
+    <div className="flex flex-col h-full min-h-0">
+      <PanelHeader title="Search" />
+      <div className="px-3 pb-2 shrink-0">
+        <div
+          className="flex items-center gap-2 rounded px-2 py-1.5"
+          style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)' }}
+        >
+          <Search size={13} style={{ color: 'var(--text-muted)' }} />
           <input
-            type="text"
+            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search portfolio..."
-            className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)]"
+            placeholder="Search across all files"
+            className="flex-1 bg-transparent outline-none text-[13px] min-w-0"
+            style={{ color: 'var(--text-primary)' }}
+            spellCheck={false}
           />
+          <button
+            onClick={() => setCaseSensitive((c) => !c)}
+            title="Match case"
+            className="text-[11px] px-1 rounded font-mono shrink-0"
+            style={{
+              background: caseSensitive ? 'var(--bg-selected)' : 'transparent',
+              color: caseSensitive ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+          >
+            Aa
+          </button>
         </div>
-        <p className="text-xs text-[var(--text-muted)] mt-3 px-1">
-          Try searching for "projects", "skills", or ask a question!
-        </p>
+        {query.trim().length >= 2 && (
+          <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {hits.length === 0
+              ? 'No results'
+              : `${hits.length} result${hits.length === 1 ? '' : 's'} in ${grouped.length} file${grouped.length === 1 ? '' : 's'}`}
+          </p>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto text-[12px]">
+        {grouped.map(([file, fileHits]) => (
+          <div key={file} className="mb-1">
+            <div
+              className="flex items-center gap-1.5 px-3 py-1 sticky top-0"
+              style={{ background: 'var(--bg-sidebar)', color: 'var(--text-secondary)' }}
+            >
+              <FileIcon filename={file} size={13} />
+              <span className="truncate">{file}</span>
+              <span className="ml-auto opacity-60">{fileHits.length}</span>
+            </div>
+            {fileHits.slice(0, 20).map((hit, i) => (
+              <button
+                key={i}
+                onClick={() => openFile(hit.file)}
+                className="w-full text-left px-3 pl-8 py-1 truncate hover:bg-[var(--bg-hover)] font-mono"
+                style={{ color: 'var(--text-muted)' }}
+                title={hit.text}
+              >
+                <span className="opacity-50 mr-2">{hit.line}</span>
+                {hit.text}
+              </button>
+            ))}
+          </div>
+        ))}
+
+        {query.trim().length < 2 && (
+          <p className="px-4 py-3 text-[12px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Searches every file in the workspace, including ones you have edited.
+            Try <span style={{ color: 'var(--text-secondary)' }}>row-level</span>,{' '}
+            <span style={{ color: 'var(--text-secondary)' }}>WebRTC</span> or{' '}
+            <span style={{ color: 'var(--text-secondary)' }}>scheduler</span>.
+          </p>
+        )}
       </div>
     </div>
   );
 };
 
-// Git Panel
+/* ================================================================== *
+ * Source control
+ * ================================================================== */
+
 const GitPanel: React.FC = () => {
-  const { github, recentActivity } = portfolioData;
+  const { tabs, openFile } = useEditorStore();
+  const { github, projects, contact } = portfolioData;
+  const dirty = tabs.filter((t) => t.isDirty);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-[var(--border-color)]">
-        <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wider">SOURCE CONTROL</span>
-      </div>
-      <div className="p-4 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <GitCommit size={16} className="text-[var(--accent-tertiary)]" />
-            <span>{github.contributions} contributions</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <GitBranch size={16} className="text-[var(--accent-tertiary)]" />
-            <span>{github.repositories} repos</span>
-          </div>
-        </div>
-        
+    <div className="flex flex-col h-full min-h-0">
+      <PanelHeader title="Source Control" />
+      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-4">
         <div>
-          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">Recent Activity</h4>
-          <div className="space-y-2">
-            {recentActivity.slice(0, 4).map((activity, idx) => (
-              <div key={idx} className="text-xs text-[var(--text-secondary)] p-2 bg-[var(--bg-tertiary)] rounded">
-                {activity.type === 'commits' ? (
-                  <span>{activity.count} commits to <span className="text-[var(--accent-primary)]">{activity.repo}</span></span>
-                ) : (
-                  <span>PR: {activity.title}</span>
-                )}
-              </div>
-            ))}
+          <h4 className="text-[11px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            Changes ({dirty.length})
+          </h4>
+          {dirty.length === 0 ? (
+            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              No local changes. Edit a file in the editor and it shows up here.
+            </p>
+          ) : (
+            dirty.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => openFile(tab.name)}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded text-[13px] hover:bg-[var(--bg-hover)]"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <FileIcon filename={tab.name} size={14} />
+                <span className="truncate">{tab.name}</span>
+                <span className="ml-auto font-mono text-[11px]" style={{ color: 'var(--warning)' }}>M</span>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div>
+          <h4 className="text-[11px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            Repositories
+          </h4>
+          <div className="flex items-center gap-2 text-[12px] mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <GitBranch size={14} style={{ color: 'var(--accent-tertiary)' }} />
+            {github.repositories} public repositories
+          </div>
+          <div className="space-y-1">
+            {projects
+              .filter((p) => p.featured)
+              .map((p) => (
+                <a
+                  key={p.id}
+                  href={p.repo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded text-[12px] hover:bg-[var(--bg-hover)]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Github size={13} className="shrink-0" />
+                  <span className="truncate">{p.name}</span>
+                  {p.stars ? (
+                    <span className="ml-auto flex items-center gap-0.5 shrink-0" style={{ color: 'var(--warning)' }}>
+                      <Star size={11} fill="currentColor" />
+                      {p.stars}
+                    </span>
+                  ) : (
+                    <ExternalLink size={11} className="ml-auto shrink-0 opacity-50" />
+                  )}
+                </a>
+              ))}
           </div>
         </div>
 
-        <a 
-          href={portfolioData.contact.github}
+        <a
+          href={contact.github}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-2 bg-[var(--accent-primary)] text-white rounded hover:bg-[var(--accent-secondary)] transition-colors text-sm"
+          className="flex items-center justify-center gap-2 w-full py-2 rounded text-[13px] transition-colors"
+          style={{ background: 'var(--accent-primary)', color: '#fff' }}
         >
-          <Github size={16} />
-          View GitHub Profile
+          <Github size={15} />
+          View GitHub profile
         </a>
       </div>
     </div>
   );
 };
 
-// Extensions Panel
+/* ================================================================== *
+ * Extensions
+ * ================================================================== */
+
 const ExtensionsPanel: React.FC = () => {
-  const [installedExtensions, setInstalledExtensions] = React.useState<string[]>(['github', 'theme', 'ai']);
-  const [installingExtension, setInstallingExtension] = React.useState<string | null>(null);
-  const [installProgress, setInstallProgress] = React.useState(0);
+  const installed = useEditorStore((s) => s.installedExtensions);
+  const [installing, setInstalling] = React.useState<string | null>(null);
+  const [progress, setProgress] = React.useState(0);
+  const [filter, setFilter] = React.useState('');
 
-  const extensions = [
-    { id: 'resume', name: 'Resume Download', description: 'Download PDF resume directly from terminal', icon: '📄', required: true },
-    { id: 'github', name: 'GitHub Integration', description: 'View GitHub activity and stats', icon: '🐙', required: false },
-    { id: 'theme', name: 'Theme Switcher', description: 'Toggle Dark/Light mode', icon: '🎨', required: false },
-    { id: 'ai', name: 'AI Assistant', description: 'Chat powered by Gemini AI', icon: '🤖', required: false },
-    { id: 'contact', name: 'Contact Form', description: 'Send direct messages', icon: '✉️', required: false },
-    { id: 'analytics', name: 'Analytics', description: 'View portfolio statistics', icon: '📊', required: false },
-    { id: 'portfolio', name: 'Portfolio Preview', description: 'View full portfolio page', icon: '🌐', required: false },
-  ];
-
-  const installExtension = (extId: string) => {
-    if (installingExtension) return;
-    
-    setInstallingExtension(extId);
-    setInstallProgress(0);
-    
-    // Simulate installation progress
-    const interval = setInterval(() => {
-      setInstallProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setInstalledExtensions(prev => [...prev, extId]);
-            setInstallingExtension(null);
-            setInstallProgress(0);
-          }, 200);
-          return 100;
+  // Install state lives in the store now — it used to be component state, so it
+  // reset every time you switched sidebar panels and the `resume` command broke.
+  const install = (id: string) => {
+    if (installing) return;
+    setInstalling(id);
+    setProgress(0);
+    const tick = window.setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) {
+          window.clearInterval(tick);
+          installExtension(id);
+          setInstalling(null);
+          return 0;
         }
-        return prev + Math.random() * 20 + 5;
+        return p + 18;
       });
-    }, 150);
+    }, 90);
   };
 
-  const uninstallExtension = (extId: string) => {
-    setInstalledExtensions(prev => prev.filter(id => id !== extId));
-  };
+  const visible = EXTENSIONS.filter(
+    (e) =>
+      e.name.toLowerCase().includes(filter.toLowerCase()) ||
+      e.description.toLowerCase().includes(filter.toLowerCase())
+  );
+  const isOn = (id: string) => installed.includes(id);
 
-  const isInstalled = (extId: string) => installedExtensions.includes(extId);
-
-  // Store installed extensions in global state for terminal access
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as unknown as { installedExtensions: string[] }).installedExtensions = installedExtensions;
-    }
-  }, [installedExtensions]);
+  const row = (ext: (typeof EXTENSIONS)[number]) => (
+    <div key={ext.id} className="flex items-start gap-3 p-2 rounded mb-1 hover:bg-[var(--bg-hover)]">
+      <span className="text-lg leading-none mt-0.5">{ext.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+          {ext.name}
+        </div>
+        <div className="text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+          {ext.description}
+        </div>
+        <div className="text-[10px] mt-0.5 opacity-60" style={{ color: 'var(--text-muted)' }}>
+          {ext.publisher}
+        </div>
+        {installing === ext.id && (
+          <div className="mt-1.5">
+            <div className="w-full h-1 rounded overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+              <div
+                className="h-full transition-all duration-100"
+                style={{ width: `${Math.min(progress, 100)}%`, background: 'var(--accent-primary)' }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+      {installing !== ext.id &&
+        (isOn(ext.id) ? (
+          <button
+            onClick={() => uninstallExtension(ext.id)}
+            className="shrink-0 text-[11px] px-2 py-1 rounded flex items-center gap-1"
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}
+            title="Uninstall"
+          >
+            <Trash2 size={11} />
+          </button>
+        ) : (
+          <button
+            onClick={() => install(ext.id)}
+            className="shrink-0 text-[11px] px-2.5 py-1 rounded"
+            style={{ background: 'var(--accent-primary)', color: '#fff' }}
+          >
+            Install
+          </button>
+        ))}
+      {isOn(ext.id) && installing !== ext.id && (
+        <Check size={13} className="shrink-0 mt-1.5" style={{ color: 'var(--success)' }} />
+      )}
+    </div>
+  );
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-[var(--border-color)]">
-        <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wider">EXTENSIONS</span>
-      </div>
-      <div className="p-3">
+    <div className="flex flex-col h-full min-h-0">
+      <PanelHeader title="Extensions" />
+      <div className="px-3 pb-2 shrink-0">
         <input
-          type="text"
-          placeholder="Search extensions..."
-          className="w-full bg-[var(--bg-tertiary)] rounded px-3 py-2 border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Search extensions"
+          className="w-full rounded px-2 py-1.5 text-[13px] outline-none"
+          style={{
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+          }}
         />
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-2">
-          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">INSTALLED ({installedExtensions.length})</h4>
-          {extensions.filter(e => isInstalled(e.id)).map((ext) => (
-            <div key={ext.id} className="flex items-start gap-3 p-2 hover:bg-[var(--bg-hover)] rounded cursor-pointer mb-1 group transition-all duration-200">
-              <span className="text-xl animate-bounce-subtle">{ext.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-[var(--text-primary)]">{ext.name}</div>
-                <div className="text-xs text-[var(--text-muted)] truncate">{ext.description}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[var(--accent-tertiary)]">✓ Installed</span>
-                <button 
-                  onClick={() => uninstallExtension(ext.id)}
-                  className="text-xs text-[var(--text-muted)] hover:text-[var(--error)] opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  Uninstall
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="px-4 py-2">
-          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">AVAILABLE</h4>
-          {extensions.filter(e => !isInstalled(e.id)).map((ext) => (
-            <div key={ext.id} className="flex items-start gap-3 p-2 hover:bg-[var(--bg-hover)] rounded cursor-pointer mb-1 transition-all duration-200">
-              <span className="text-xl">{ext.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">{ext.name}</span>
-                  {ext.required && (
-                    <span className="text-[10px] bg-[var(--warning)] text-black px-1.5 py-0.5 rounded">Required</span>
-                  )}
-                </div>
-                <div className="text-xs text-[var(--text-muted)] truncate">{ext.description}</div>
-                {installingExtension === ext.id && (
-                  <div className="mt-2">
-                    <div className="w-full h-1.5 bg-[var(--bg-tertiary)] rounded overflow-hidden">
-                      <div 
-                        className="h-full bg-[var(--accent-primary)] transition-all duration-150 ease-out"
-                        style={{ width: `${Math.min(installProgress, 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-[var(--text-muted)]">Installing... {Math.round(installProgress)}%</span>
-                  </div>
-                )}
-              </div>
-              {installingExtension !== ext.id && (
-                <button 
-                  onClick={() => installExtension(ext.id)}
-                  className="text-xs bg-[var(--accent-primary)] text-white px-3 py-1.5 rounded hover:bg-[var(--accent-secondary)] transition-colors flex items-center gap-1"
-                >
-                  <Plus size={12} />
-                  Install
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
+        <h4 className="px-2 py-1 text-[11px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+          Installed ({visible.filter((e) => isOn(e.id)).length})
+        </h4>
+        {visible.filter((e) => isOn(e.id)).map(row)}
+
+        {visible.some((e) => !isOn(e.id)) && (
+          <>
+            <h4 className="px-2 py-1 mt-2 text-[11px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+              Available
+            </h4>
+            {visible.filter((e) => !isOn(e.id)).map(row)}
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-// AI Panel
-const AIPanel: React.FC = () => {
-  const [messages, setMessages] = React.useState([
-    { role: 'assistant', content: "Hi! I'm your AI assistant powered by Gemini. Ask me anything about Anubhav's portfolio, skills, or projects!" }
+/* ================================================================== *
+ * Assistant — offline
+ * ================================================================== */
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  answer: Answer;
+}
+
+const AssistantPanel: React.FC = () => {
+  const { openFile } = useEditorStore();
+  const [messages, setMessages] = React.useState<ChatMessage[]>([
+    {
+      role: 'assistant',
+      answer: {
+        text:
+          "I answer from this portfolio's own data — no API key, no network call, so I can't invent a project that doesn't exist or fail because a service is down.\n\nAsk me anything about the work.",
+      },
+    },
   ]);
   const [input, setInput] = React.useState('');
+  const endRef = React.useRef<HTMLDivElement>(null);
 
-  const suggestions = [
-    "What are Anubhav's skills?",
-    "Tell me about ARGON OS",
-    "What projects has he built?",
-  ];
+  React.useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages]);
+
+  const send = (text: string) => {
+    const question = text.trim();
+    if (!question) return;
+    setMessages((m) => [
+      ...m,
+      { role: 'user', answer: { text: question } },
+      { role: 'assistant', answer: ask(question) },
+    ]);
+    setInput('');
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
-        <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wider">AI ASSISTANT</span>
-        <span className="text-xs bg-[var(--accent-primary)] text-white px-2 py-0.5 rounded animate-pulse-glow">Gemini</span>
+    <div className="flex flex-col h-full min-h-0">
+      <div
+        className="flex items-center justify-between px-4 py-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--border-color)' }}
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+          Assistant
+        </span>
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded"
+          style={{ background: 'var(--bg-tertiary)', color: 'var(--success)' }}
+          title="Runs entirely in your browser"
+        >
+          offline
+        </span>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={cn(
-            "flex gap-3",
-            msg.role === 'user' && "flex-row-reverse"
-          )}>
-            <div className={cn(
-              "w-8 h-8 rounded flex items-center justify-center flex-shrink-0",
-              msg.role === 'assistant' ? "bg-[var(--accent-primary)]" : "bg-[var(--bg-tertiary)]"
-            )}>
-              {msg.role === 'assistant' ? '🤖' : '👤'}
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {messages.map((msg, i) => (
+          <div key={i} className={cn('flex gap-2', msg.role === 'user' && 'flex-row-reverse')}>
+            <div
+              className="w-6 h-6 rounded flex items-center justify-center shrink-0 text-[11px]"
+              style={{
+                background: msg.role === 'assistant' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                color: msg.role === 'assistant' ? '#fff' : 'var(--text-primary)',
+              }}
+            >
+              {msg.role === 'assistant' ? <Bot size={13} /> : 'You'.charAt(0)}
             </div>
-            <div className={cn(
-              "max-w-[80%] p-3 rounded-lg text-sm",
-              msg.role === 'assistant' ? "bg-[var(--bg-tertiary)]" : "bg-[var(--accent-primary)] text-white"
-            )}>
-              {msg.content}
+            <div
+              className="max-w-[85%] px-3 py-2 rounded-lg text-[12px] leading-relaxed whitespace-pre-wrap break-words"
+              style={{
+                background: msg.role === 'assistant' ? 'var(--bg-tertiary)' : 'var(--accent-primary)',
+                color: msg.role === 'assistant' ? 'var(--text-primary)' : '#fff',
+              }}
+            >
+              {msg.answer.text}
+
+              {msg.answer.files && msg.answer.files.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {msg.answer.files.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => openFile(f)}
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px]"
+                      style={{ background: 'var(--bg-secondary)', color: 'var(--accent-secondary)' }}
+                    >
+                      <FileIcon filename={f} size={11} />
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {msg.answer.links && msg.answer.links.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {msg.answer.links.map((l) => (
+                    <a
+                      key={l.url}
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px]"
+                      style={{ background: 'var(--bg-secondary)', color: 'var(--accent-secondary)' }}
+                    >
+                      <ExternalLink size={10} />
+                      {l.label}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
+        <div ref={endRef} />
       </div>
-      <div className="p-4 border-t border-[var(--border-color)]">
-        <div className="flex gap-2 mb-3">
-          <textarea
+
+      <div className="p-3 shrink-0" style={{ borderTop: '1px solid var(--border-color)' }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(input);
+          }}
+          className="flex gap-2 mb-2"
+        >
+          <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about Anubhav's experience..."
-            className="flex-1 bg-[var(--bg-tertiary)] rounded px-3 py-2 border border-[var(--border-color)] text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] resize-none"
-            rows={2}
+            placeholder="Ask about the work..."
+            className="flex-1 rounded px-2 py-1.5 text-[12px] outline-none min-w-0"
+            style={{
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+            }}
           />
-          <button className="px-4 bg-[var(--accent-primary)] text-white rounded hover:bg-[var(--accent-secondary)] transition-colors">
-            Send
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            className="px-2.5 rounded disabled:opacity-40"
+            style={{ background: 'var(--accent-primary)', color: '#fff' }}
+            aria-label="Send"
+          >
+            <Send size={14} />
           </button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {suggestions.map((s, idx) => (
+        </form>
+        <div className="flex flex-wrap gap-1.5">
+          {SUGGESTED_QUESTIONS.slice(0, 4).map((q) => (
             <button
-              key={idx}
-              onClick={() => setInput(s)}
-              className="text-xs px-2 py-1 bg-[var(--bg-tertiary)] rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+              key={q}
+              onClick={() => send(q)}
+              className="text-[11px] px-2 py-1 rounded hover:brightness-125"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
             >
-              {s}
+              {q}
             </button>
           ))}
         </div>
@@ -663,109 +683,265 @@ const AIPanel: React.FC = () => {
   );
 };
 
-// Account Panel
+/* ================================================================== *
+ * Account
+ * ================================================================== */
+
 const AccountPanel: React.FC = () => {
-  const { personal, contact } = portfolioData;
+  const { personal, contact, impact } = portfolioData;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-[var(--border-color)]">
-        <span className="text-xs font-semibold text-[var(--text-muted)] tracking-wider">ACCOUNT</span>
-      </div>
-      <div className="p-4">
-        <div className="text-center mb-6">
+    <div className="flex flex-col h-full min-h-0">
+      <PanelHeader title="Account" />
+      <div className="flex-1 overflow-y-auto px-4 pb-6">
+        <div className="text-center mb-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={personal.avatar}
-            alt={personal.name}
-            className="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-[var(--accent-primary)] animate-float-subtle"
+            alt=""
+            className="w-20 h-20 rounded-full mx-auto mb-3 object-cover"
+            style={{ border: '2px solid var(--accent-primary)' }}
           />
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{personal.name}</h3>
-          <p className="text-sm text-[var(--text-secondary)]">{personal.title.split('|')[0].trim()}</p>
+          <h3 className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {personal.name}
+          </h3>
+          <p className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+            {personal.title}
+          </p>
+          <p
+            className="text-[11px] mt-1 flex items-center justify-center gap-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <MapPin size={11} />
+            {personal.location} · {personal.timezone}
+          </p>
         </div>
-        <div className="flex justify-center gap-4 mb-6">
-          <a href={contact.github} target="_blank" rel="noopener noreferrer" className="p-2 bg-[var(--bg-tertiary)] rounded-full hover:bg-[var(--bg-hover)] transition-colors">
-            <Github size={20} className="text-[var(--text-primary)]" />
-          </a>
-          <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 bg-[var(--bg-tertiary)] rounded-full hover:bg-[var(--bg-hover)] transition-colors">
-            <Linkedin size={20} className="text-[#0077b5]" />
-          </a>
 
-          <a href={`mailto:${contact.email}`} className="p-2 bg-[var(--bg-tertiary)] rounded-full hover:bg-[var(--bg-hover)] transition-colors">
-            <Mail size={20} className="text-[var(--text-primary)]" />
-          </a>
+        <div className="flex justify-center gap-3 mb-5">
+          {[
+            { href: contact.github, icon: Github, label: 'GitHub' },
+            { href: contact.linkedin, icon: Linkedin, label: 'LinkedIn' },
+            { href: `mailto:${contact.email}`, icon: Mail, label: 'Email' },
+            { href: contact.website, icon: Globe, label: 'Website' },
+          ].map(({ href, icon: Icon, label }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={label}
+              aria-label={label}
+              className="p-2 rounded-full hover:bg-[var(--bg-hover)]"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+            >
+              <Icon size={16} />
+            </a>
+          ))}
         </div>
-        <div className="text-center text-sm text-[var(--text-secondary)]">
-          <p>{personal.education.degree} @ {personal.education.university}</p>
-          <p className="text-[var(--accent-tertiary)]">{personal.education.status}</p>
+
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {impact.slice(0, 4).map((stat) => (
+            <div key={stat.label} className="p-2 rounded text-center" style={{ background: 'var(--bg-tertiary)' }}>
+              <div className="text-[16px] font-semibold" style={{ color: 'var(--accent-secondary)' }}>
+                {stat.value}
+              </div>
+              <div className="text-[10px] leading-tight" style={{ color: 'var(--text-muted)' }}>
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center text-[12px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+          <p>{personal.education.degree}</p>
+          <p style={{ color: 'var(--text-muted)' }}>
+            {personal.education.university} — {personal.education.status}
+          </p>
+          <p className="mt-3" style={{ color: 'var(--success)' }}>
+            {personal.availability}
+          </p>
+        </div>
+
+        <a
+          href={contact.resume}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 flex items-center justify-center gap-2 w-full py-2 rounded text-[13px]"
+          style={{ background: 'var(--accent-primary)', color: '#fff' }}
+        >
+          Download resume
+        </a>
+      </div>
+    </div>
+  );
+};
+
+/* ================================================================== *
+ * Settings — the gear used to do nothing
+ * ================================================================== */
+
+// Defined at module scope: a component created inside another component's render is a
+// brand new type on every render, so React unmounts and remounts its whole subtree.
+const SettingToggle: React.FC<{
+  label: string;
+  hint?: string;
+  on: boolean;
+  onChange: () => void;
+}> = ({ label, hint, on, onChange }) => (
+  <button onClick={onChange} className="w-full flex items-start gap-3 px-1 py-2 text-left">
+    <span
+      className="mt-0.5 w-8 h-[18px] rounded-full shrink-0 relative transition-colors"
+      style={{ background: on ? 'var(--accent-primary)' : 'var(--bg-tertiary)' }}
+    >
+      <span
+        className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all"
+        style={{ left: on ? '16px' : '2px' }}
+      />
+    </span>
+    <span className="min-w-0">
+      <span className="block text-[13px]" style={{ color: 'var(--text-primary)' }}>{label}</span>
+      {hint && <span className="block text-[11px]" style={{ color: 'var(--text-muted)' }}>{hint}</span>}
+    </span>
+  </button>
+);
+
+const SettingsPanel: React.FC = () => {
+  const {
+    theme, setTheme, fontSize, setFontSize, showMinimap, toggleMinimap,
+    showLineNumbers, toggleLineNumbers, animations, toggleAnimations,
+  } = useThemeStore();
+  const { stdin, setStdin } = useRunnerStore();
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <PanelHeader title="Settings" />
+      <div className="flex-1 overflow-y-auto px-3 pb-6 space-y-4">
+        <div>
+          <h4 className="text-[11px] font-semibold uppercase mb-2" style={{ color: 'var(--text-muted)' }}>
+            Appearance
+          </h4>
+          <div className="flex gap-2 mb-3">
+            {(['dark', 'light'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className="flex-1 py-1.5 rounded text-[12px] capitalize"
+                style={{
+                  background: theme === t ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                  color: theme === t ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <label className="block text-[12px] mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Editor font size — {fontSize}px
+          </label>
+          <input
+            type="range"
+            min={10}
+            max={22}
+            value={fontSize}
+            onChange={(e) => setFontSize(Number(e.target.value))}
+            className="w-full accent-[var(--accent-primary)]"
+          />
+        </div>
+
+        <div>
+          <h4 className="text-[11px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            Editor
+          </h4>
+          <SettingToggle label="Line numbers" on={showLineNumbers} onChange={toggleLineNumbers} />
+          <SettingToggle label="Minimap" on={showMinimap} onChange={toggleMinimap} />
+          <SettingToggle
+            label="Animations"
+            hint="Turn off to reduce motion"
+            on={animations}
+            onChange={toggleAnimations}
+          />
+        </div>
+
+        <div>
+          <h4 className="text-[11px] font-semibold uppercase mb-1" style={{ color: 'var(--text-muted)' }}>
+            Code runner
+          </h4>
+          <label className="block text-[12px] mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Default stdin
+          </label>
+          <textarea
+            value={stdin}
+            onChange={(e) => setStdin(e.target.value)}
+            rows={3}
+            spellCheck={false}
+            placeholder="Piped into the next program you run"
+            className="w-full rounded px-2 py-1.5 text-[12px] font-mono outline-none resize-y"
+            style={{
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+            }}
+          />
+          <p className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            JavaScript, TypeScript and Python execute in this browser tab. C, C++, Java, Go
+            and Rust are compiled in a public remote sandbox, so those need a connection.
+          </p>
         </div>
       </div>
     </div>
   );
 };
 
-// Main Sidebar Component
+/* ================================================================== *
+ * Shell
+ * ================================================================== */
+
 export default function Sidebar() {
   const { sidebarPanel, sidebarOpen } = useEditorStore();
-  const [width, setWidth] = React.useState(260);
-  const [isDragging, setIsDragging] = React.useState(false);
-  const [isMobile, setIsMobile] = React.useState(false);
+  const [width, setWidth] = React.useState(280);
+  const [dragging, setDragging] = React.useState(false);
+  const isMobile = useIsMobile();
 
   React.useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  React.useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const newWidth = e.clientX - 48; // 48 is activity bar width
-      setWidth(Math.max(180, Math.min(500, newWidth)));
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => setWidth(Math.max(200, Math.min(520, e.clientX - 48)));
+    const onUp = () => setDragging(false);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'ew-resize';
-      document.body.style.userSelect = 'none';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
+  }, [dragging]);
 
   if (!sidebarOpen) return null;
 
   return (
-    <aside 
-      className="bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] flex flex-col overflow-hidden relative h-full"
-      style={{ 
-        width: isMobile ? '280px' : `${width}px`, 
-        minWidth: isMobile ? '280px' : '180px', 
-        maxWidth: isMobile ? '85vw' : '500px' 
+    <aside
+      className="flex flex-col overflow-hidden relative h-full shrink-0"
+      style={{
+        width: isMobile ? '284px' : `${width}px`,
+        background: 'var(--bg-sidebar)',
+        borderRight: '1px solid var(--border-color)',
       }}
     >
       {sidebarPanel === 'explorer' && <ExplorerPanel />}
       {sidebarPanel === 'search' && <SearchPanel />}
       {sidebarPanel === 'git' && <GitPanel />}
       {sidebarPanel === 'extensions' && <ExtensionsPanel />}
-      {sidebarPanel === 'ai' && <AIPanel />}
+      {sidebarPanel === 'ai' && <AssistantPanel />}
       {sidebarPanel === 'account' && <AccountPanel />}
-      
-      {/* Resize Handle - Hidden on mobile */}
+      {sidebarPanel === 'settings' && <SettingsPanel />}
+
       {!isMobile && (
-        <div 
-          className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-[var(--accent-primary)] transition-colors z-10"
-          onMouseDown={() => setIsDragging(true)}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-[var(--accent-primary)] z-10"
+          onMouseDown={() => setDragging(true)}
         />
       )}
     </aside>

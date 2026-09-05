@@ -1,20 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import IDELayout from '@/components/IDELayout';
 import LandingPage from '@/components/LandingPage';
+import { useMounted } from '@/lib/hooks';
 
 export default function Home() {
-    const [view, setView] = useState<'landing' | 'ide' | null>(null);
-    const [mounted, setMounted] = useState(false);
-    const [ideKey, setIdeKey] = useState(0); // Force remount key
-
-    useEffect(() => {
-        setMounted(true);
-        // Always show landing page first - no auto-redirect based on saved choice
-        // This allows users to switch between views easily
-        setView('landing');
-    }, []);
+    // Always start on the landing page so a visitor can switch views freely.
+    const [view, setView] = useState<'landing' | 'ide'>('landing');
+    const [ideKey, setIdeKey] = useState(0); // remount key
+    const mounted = useMounted();
 
     const handleSelectIDE = () => {
         // Aggressive cleanup before switching to IDE
@@ -40,7 +35,7 @@ export default function Home() {
         setView('ide');
     };
 
-    if (!mounted || view === null) {
+    if (!mounted) {
         return null;
     }
 

@@ -1,628 +1,618 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useEditorStore } from '@/store/editor';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useEditorStore, hasExtension } from '@/store/editor';
+import { useRunnerStore, type LineKind } from '@/store/runner';
 import { portfolioData } from '@/data/portfolio';
+import { fileContents, playgroundFiles } from '@/data/files';
+import { languageFor, LANGUAGES } from '@/lib/runtime';
 import { cn } from '@/lib/utils';
 import {
-  Terminal as TerminalIcon,
-  Bug,
-  FileOutput,
-  Trash2,
-  Maximize2,
-  Minimize2,
-  X,
-  GripHorizontal,
-  Plus,
-  ChevronDown,
+  Terminal as TerminalIcon, Bug, FileOutput, Trash2, Maximize2, Minimize2,
+  X, ChevronRight, Keyboard,
 } from 'lucide-react';
 
-interface TerminalLine {
-  type: 'input' | 'output' | 'error' | 'success' | 'info';
-  content: string;
-}
+const HELP = `
+Portfolio shell — a small but real shell.
 
-const commandHelp = `
-Available commands:
-  help          - Show this help message
-  about         - Display information about Anubhav
-  skills        - List technical skills
-  projects      - Show featured projects
-  contact       - Display contact information
-  github        - Open GitHub profile
-  linkedin      - Open LinkedIn profile
-  resume        - Download resume
-  clear         - Clear terminal
-  ls            - List portfolio files
-  cat <file>    - Display file contents
-  whoami        - Display current user
-  date          - Show current date
-  neofetch      - System information (fun)
-  
-  npm run dev   - Start the portfolio website (opens in browser)
-  npm start     - Start the portfolio website
-  node <file>   - Run a JavaScript file
-  python <file> - Run a Python file
-  run <file>    - Auto-detect and run file
+  Content
+    about            Who I am and what I do
+    products         Things running in production right now
+    projects         Selected engineering work
+    skills           Stack, sorted honestly
+    contact          Every way to reach me
+    resume           Download the PDF
+    open <url>       Open a URL in the Simple Browser
+
+  Files
+    ls [dir]         List files
+    cat <file>       Print a file
+    edit <file>      Open a file in the editor
+
+  Running code            (these actually execute)
+    run <file>       Detect the language and run it
+    node <file.js>   JavaScript / TypeScript, locally in a Web Worker
+    python <file.py> Real CPython on WebAssembly, locally
+    gcc <file.c>     Compile and run C
+    g++ <file.cpp>   Compile and run C++
+    stdin <text>     Set the input the next program reads
+    langs            Every language this shell can run
+    stop             Stop whatever is running
+
+  Shell
+    clear            Clear the terminal
+    whoami / pwd / date / echo / neofetch / help
 `;
 
-const neofetchOutput = `
-       ████████████████       anubhav@portfolio
-     ██                ██     -----------------
-   ██    ██████████    ██     OS: Portfolio IDE 1.0
-   ██  ██          ██  ██     Host: Next.js 14
-   ██  ██  ██████  ██  ██     Kernel: React 18
-   ██  ██  ██████  ██  ██     Shell: TypeScript
-   ██  ██          ██  ██     Theme: VS Code Dark+
-   ██    ██████████    ██     Icons: Lucide React
-     ██                ██     Terminal: Custom
-       ████████████████       
-                              Languages: C, C++, Python,
-   Anubhav Mishra             JavaScript, TypeScript
-   Full-Stack Developer       
-   Systems Enthusiast         Projects: 41 repos
-                              Commits: 467 (last year)
+const NEOFETCH = `
+       ████████████████       guest@anubhav-portfolio
+     ██                ██     --------------------------------
+   ██    ██████████    ██     OS:        Portfolio IDE 2.0
+   ██  ██          ██  ██     Host:      Next.js (static export)
+   ██  ██  ██████  ██  ██     Kernel:    React 19
+   ██  ██  ██████  ██  ██     Shell:     portfolio-sh
+   ██  ██          ██  ██     Theme:     VS Code Dark+
+   ██    ██████████    ██     Runtimes:  Web Worker, Pyodide, remote gcc
+     ██                ██
+       ████████████████       Live products: 5
+                              Repositories:  116
+   Anubhav Mishra             Stack layers:  bootloader -> SaaS
+   Product Engineer
+   Dehradun, India            Try: run fizzbuzz.py
 `;
 
 export default function Terminal() {
-  const { terminalOpen, toggleTerminal, terminalHeight, setTerminalHeight, openSimpleBrowser, userFiles } = useEditorStore();
-  const [lines, setLines] = useState<TerminalLine[]>([
-    { type: 'info', content: 'Welcome to Anubhav\'s Portfolio Terminal v1.0.0' },
-    { type: 'info', content: 'Type "help" for available commands.\n' },
-  ]);
+  const {
+    terminalOpen, toggleTerminal, terminalHeight, setTerminalHeight,
+    openSimpleBrowser, previewDocument, contentOf, openFile, fileTree, allFilenames,
+  } = useEditorStore();
+  const { lines, write, clear, run, stop, running, stdin, setStdin } = useRunnerStore();
+
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [activeTab, setActiveTab] = useState<'terminal' | 'problems' | 'output'>('terminal');
-  const [terminals, setTerminals] = useState([{ id: 1, name: 'bash' }]);
-  const [activeTerminal, setActiveTerminal] = useState(1);
+  const [tab, setTab] = useState<'terminal' | 'problems' | 'output'>('terminal');
+  const [showStdin, setShowStdin] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
-  // Render line content with clickable links
-  const renderLineContent = (content: string) => {
-    // Check for __LINK__ markers
-    const linkRegex = /__LINK__(.*?)__LINK__/g;
-    const parts: (string | React.ReactElement)[] = [];
-    let lastIndex = 0;
-    let match;
-    
-    while ((match = linkRegex.exec(content)) !== null) {
-      // Add text before the link
-      if (match.index > lastIndex) {
-        parts.push(content.slice(lastIndex, match.index));
-      }
-      // Add the clickable link
-      const url = match[1];
-      parts.push(
-        <a 
-          key={match.index}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[var(--accent-primary)] hover:underline cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          {url}
-        </a>
-      );
-      lastIndex = match.index + match[0].length;
-    }
-    
-    // Add remaining text
-    if (lastIndex < content.length) {
-      parts.push(content.slice(lastIndex));
-    }
-    
-    return parts.length > 0 ? parts : content;
-  };
-
-  const addNewTerminal = () => {
-    const newId = Math.max(...terminals.map(t => t.id)) + 1;
-    setTerminals([...terminals, { id: newId, name: 'bash' }]);
-    setActiveTerminal(newId);
-  };
-
   useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
+    if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;
   }, [lines]);
 
-  // Handle drag resize
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  /* ---------------- resize ---------------- */
+  const startDrag = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
   }, []);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const windowHeight = window.innerHeight;
-      const newHeight = windowHeight - e.clientY - 22;
-      const clampedHeight = Math.max(100, Math.min(windowHeight * 0.7, newHeight));
-      setTerminalHeight(clampedHeight);
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const next = window.innerHeight - e.clientY - 22;
+      setTerminalHeight(Math.max(120, Math.min(window.innerHeight * 0.8, next)));
     };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'ns-resize';
-      document.body.style.userSelect = 'none';
-    }
-
+    const onUp = () => setIsDragging(false);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
   }, [isDragging, setTerminalHeight]);
 
-  const processCommand = (cmd: string): TerminalLine[] => {
-    const parts = cmd.trim().toLowerCase().split(' ');
-    const command = parts[0];
+  /* ---------------- file helpers ---------------- */
+
+  // Case-insensitive lookup, but the real filename is preserved — the old shell
+  // lowercased the whole command line, so `cat README.md` looked for `readme.md`.
+  const resolveFile = (name: string): string | null => {
+    const names = allFilenames();
+    const exact = names.find((n) => n === name);
+    if (exact) return exact;
+    const base = name.split('/').pop() ?? name;
+    return names.find((n) => n.toLowerCase() === base.toLowerCase()) ?? null;
+  };
+
+  const listFiles = (): string[] => {
+    const out: string[] = [];
+    const walk = (nodes: typeof fileTree, depth: number) => {
+      for (const n of nodes) {
+        out.push(`${'  '.repeat(depth)}${n.type === 'folder' ? `${n.name}/` : n.name}`);
+        if (n.children) walk(n.children, depth + 1);
+      }
+    };
+    walk(fileTree[0]?.children ?? [], 0);
+    return out;
+  };
+
+  /* ---------------- command execution ---------------- */
+
+  const execute = async (raw: string) => {
+    // Case is preserved for arguments; only the verb is normalised.
+    const parts = raw.trim().split(/\s+/);
+    const cmd = (parts[0] ?? '').toLowerCase();
     const args = parts.slice(1);
+    const { personal, contact, products, projects, skills } = portfolioData;
 
-    switch (command) {
+    const runFile = async (name: string, expect?: RegExp) => {
+      const resolved = resolveFile(name);
+      if (!resolved) {
+        write('stderr', `${name}: no such file`);
+        return;
+      }
+      if (expect && !expect.test(resolved)) {
+        write('stderr', `${resolved}: wrong file type for \`${cmd}\``);
+        return;
+      }
+      if (!languageFor(resolved)) {
+        write('stderr', `${resolved}: nothing here knows how to run this file type`);
+        return;
+      }
+      await run(resolved, contentOf(resolved), (doc, title) => previewDocument(doc, title));
+    };
+
+    switch (cmd) {
+      case '':
+        return;
+
       case 'help':
-        return [{ type: 'output', content: commandHelp }];
-      
-      case 'about':
-        return [
-          { type: 'success', content: `\n👤 ${portfolioData.personal.name}` },
-          { type: 'output', content: portfolioData.personal.title },
-          { type: 'output', content: `\n${portfolioData.personal.tagline}` },
-          { type: 'info', content: `\n🎓 ${portfolioData.personal.education.degree} @ ${portfolioData.personal.education.university}` },
-          { type: 'info', content: `   Status: ${portfolioData.personal.education.status}\n` },
-        ];
-      
-      case 'skills':
-        const { skills } = portfolioData;
-        return [
-          { type: 'success', content: '\n💻 Technical Skills\n' },
-          { type: 'info', content: '  Languages:' },
-          { type: 'output', content: `    ${skills.languages.map(s => s.name).join(', ')}` },
-          { type: 'info', content: '  Frameworks:' },
-          { type: 'output', content: `    ${skills.frameworks.map(s => s.name).join(', ')}` },
-          { type: 'info', content: '  Databases:' },
-          { type: 'output', content: `    ${skills.databases.map(s => s.name).join(', ')}` },
-          { type: 'info', content: '  Tools:' },
-          { type: 'output', content: `    ${skills.tools.map(s => s.name).join(', ')}\n` },
-        ];
-      
-      case 'projects':
-        const featured = portfolioData.projects.filter(p => p.featured);
-        return [
-          { type: 'success', content: '\n🚀 Featured Projects\n' },
-          ...featured.flatMap(p => [
-            { type: 'info' as const, content: `  ${p.icon} ${p.name}` },
-            { type: 'output' as const, content: `     ${p.description}` },
-            { type: 'output' as const, content: `     Tech: ${p.tech.join(', ')}\n` },
-          ]),
-        ];
-      
-      case 'contact':
-        const { contact } = portfolioData;
-        return [
-          { type: 'success', content: '\n📫 Contact Information\n' },
-          { type: 'info', content: `  📧 Email:    ${contact.email}` },
-          { type: 'info', content: `  💻 GitHub:   github.com/anubhav-n-mishra` },
-          { type: 'info', content: `  💼 LinkedIn: linkedin.com/in/anubhav-mishra0` },
+        write('stdout', HELP);
+        return;
 
-        ];
-      
+      case 'about':
+        write('success', `\n${personal.name} — ${personal.title}`);
+        write('stdout', personal.subtitle);
+        write('stdout', `\n${personal.tagline}\n`);
+        write('info', `${personal.education.degree}`);
+        write('info', `${personal.education.university} — ${personal.education.status}`);
+        write('info', `${personal.location} · ${personal.timezone}\n`);
+        return;
+
+      case 'products':
+        write('success', '\nLive in production\n');
+        for (const p of products) {
+          write('info', `  ${p.name}`);
+          write('stdout', `    ${p.tagline}`);
+          if (p.url) write('stdout', `    ${p.url}${p.note ? `  (${p.note})` : ''}`);
+          write('stdout', `    ${p.tech.slice(0, 5).join(', ')}\n`);
+        }
+        return;
+
+      case 'projects':
+        write('success', '\nSelected engineering\n');
+        for (const p of projects.filter((x) => x.featured)) {
+          write('info', `  ${p.name}${p.stars ? `  ★${p.stars}` : ''}`);
+          write('stdout', `    ${p.description}`);
+          write('stdout', `    ${p.tech.join(', ')}\n`);
+        }
+        write('stdout', `Run \`projects all\` for the rest.\n`);
+        if (args[0] === 'all') {
+          for (const p of projects.filter((x) => !x.featured)) {
+            write('info', `  ${p.name}`);
+            write('stdout', `    ${p.description}\n`);
+          }
+        }
+        return;
+
+      case 'skills':
+        write('success', '\nStack, sorted honestly\n');
+        for (const group of [skills.confident, skills.shipped, skills.learning]) {
+          write('info', `  ${group.label}`);
+          write('stdout', `    ${group.items.join(' · ')}\n`);
+        }
+        return;
+
+      case 'contact':
+        write('success', '\nContact\n');
+        write('info', `  Email     ${contact.email}`);
+        write('info', `  GitHub    ${contact.github}`);
+        write('info', `  LinkedIn  ${contact.linkedin}`);
+        write('info', `  Web       ${contact.website}\n`);
+        write('stdout', `${personal.availability}.`);
+        write('stdout', `${personal.responseTime}.\n`);
+        return;
+
       case 'github':
-        window.open(portfolioData.contact.github, '_blank');
-        return [{ type: 'success', content: 'Opening GitHub profile...' }];
-      
+        window.open(contact.github, '_blank', 'noopener,noreferrer');
+        write('success', 'Opening GitHub profile...');
+        return;
+
       case 'linkedin':
-        window.open(portfolioData.contact.linkedin, '_blank');
-        return [{ type: 'success', content: 'Opening LinkedIn profile...' }];
-      
+        window.open(contact.linkedin, '_blank', 'noopener,noreferrer');
+        write('success', 'Opening LinkedIn profile...');
+        return;
+
       case 'resume':
-        // Check if resume extension is installed
-        const installedExts = typeof window !== 'undefined' 
-          ? (window as unknown as { installedExtensions?: string[] }).installedExtensions || []
-          : [];
-        
-        if (!installedExts.includes('resume')) {
-          return [
-            { type: 'error', content: '\n❌ Resume Download extension is not installed!' },
-            { type: 'info', content: '   To download the resume, please install the "Resume Download" extension first.' },
-            { type: 'info', content: '   Go to Extensions panel (Ctrl+Shift+X) and install it.\n' },
-          ];
+        if (!hasExtension('resume')) {
+          write('stderr', 'The Resume Download extension is not installed.');
+          write('info', 'Open Extensions (Ctrl+Shift+X) and install it, then try again.');
+          return;
         }
-        window.open('/Anubhav_Mishra.pdf', '_blank');
-        return [{ type: 'success', content: '📄 Opening resume PDF...' }];
-      
+        window.open(contact.resume, '_blank', 'noopener,noreferrer');
+        write('success', 'Opening resume PDF...');
+        return;
+
       case 'clear':
-        // Return special marker to indicate clear
-        return [{ type: 'info', content: '__CLEAR__' }];
-      
+        clear();
+        return;
+
       case 'ls':
-        return [
-          { type: 'output', content: '\ndrwxr-xr-x  src/' },
-          { type: 'output', content: 'drwxr-xr-x  config/' },
-          { type: 'output', content: '-rw-r--r--  README.md' },
-          { type: 'output', content: '-rw-r--r--  package.json\n' },
-        ];
-      
-      case 'cat':
+        write('stdout', `\n${listFiles().join('\n')}\n`);
+        return;
+
+      case 'cat': {
+        if (!args[0]) {
+          write('stderr', 'usage: cat <file>');
+          return;
+        }
+        const resolved = resolveFile(args[0]);
+        if (!resolved) {
+          write('stderr', `${args[0]}: no such file`);
+          return;
+        }
+        write('stdout', `\n${contentOf(resolved)}`);
+        return;
+      }
+
+      case 'edit': {
+        if (!args[0]) {
+          write('stderr', 'usage: edit <file>');
+          return;
+        }
+        const resolved = resolveFile(args[0]);
+        if (!resolved) {
+          write('stderr', `${args[0]}: no such file`);
+          return;
+        }
+        openFile(resolved);
+        write('success', `Opened ${resolved} in the editor.`);
+        return;
+      }
+
+      case 'langs':
+        write('success', '\nLanguages this shell can run\n');
+        for (const l of LANGUAGES) {
+          const where = l.remote ? 'remote sandbox' : 'in your browser';
+          write('stdout', `  ${l.label.padEnd(12)} .${l.extensions[0].padEnd(6)} ${where}`);
+        }
+        write('info', '\nJS, TS and Python run locally and keep working with the network down.\n');
+        return;
+
+      case 'stdin':
         if (args.length === 0) {
-          return [{ type: 'error', content: 'Usage: cat <filename>' }];
+          write('stdout', stdin ? `stdin is:\n${stdin}` : 'stdin is empty.');
+          return;
         }
-        return [{ type: 'info', content: `Use the editor to view ${args[0]}` }];
-      
-      case 'whoami':
-        return [{ type: 'output', content: 'guest@anubhav-portfolio' }];
-      
-      case 'date':
-        return [{ type: 'output', content: new Date().toString() }];
-      
-      case 'neofetch':
-        return [{ type: 'output', content: neofetchOutput }];
-      
-      case 'echo':
-        return [{ type: 'output', content: args.join(' ') }];
-      
-      case 'pwd':
-        return [{ type: 'output', content: '/home/guest/anubhav-portfolio' }];
-      
-      case 'npm':
-        if (args[0] === 'run' && args[1] === 'dev') {
-          setTimeout(() => {
-            openSimpleBrowser('/portfolio');
-          }, 1500);
-          return [
-            { type: 'info', content: '\n> anubhav-portfolio@1.0.0 dev' },
-            { type: 'info', content: '> next dev\n' },
-            { type: 'output', content: '  ▲ Next.js 14.0.0' },
-            { type: 'output', content: '  - Local:        __LINK__https://mishraanubhav.me/portfolio__LINK__' },
-            { type: 'output', content: '  - Environments: .env\n' },
-            { type: 'success', content: '  ✓ Ready in 1.2s' },
-            { type: 'info', content: '\nOpening browser...\n' },
-          ];
+        setStdin(args.join(' ').replace(/\\n/g, '\n'));
+        write('success', 'stdin set for the next run.');
+        return;
+
+      case 'stop':
+        if (!running) {
+          write('stdout', 'Nothing is running.');
+          return;
         }
-        if (args[0] === 'start') {
-          setTimeout(() => {
-            openSimpleBrowser('/portfolio');
-          }, 1000);
-          return [
-            { type: 'info', content: '\n> anubhav-portfolio@1.0.0 start' },
-            { type: 'info', content: '> next start\n' },
-            { type: 'success', content: '  ✓ Starting production server...' },
-            { type: 'output', content: '  ✓ Ready on __LINK__https://mishraanubhav.me/portfolio__LINK__' },
-            { type: 'info', content: '\nOpening browser...\n' },
-          ];
+        stop();
+        return;
+
+      case 'run':
+        if (!args[0]) {
+          write('stderr', `usage: run <file>   (try: ${playgroundFiles.join(', ')})`);
+          return;
         }
-        if (args[0] === 'run' && args[1] === 'portfolio') {
-          setTimeout(() => {
-            openSimpleBrowser('/portfolio');
-          }, 1000);
-          return [
-            { type: 'info', content: '\n> anubhav-portfolio@1.0.0 portfolio' },
-            { type: 'info', content: '> Opening portfolio website...\n' },
-            { type: 'success', content: '  ✓ Ready\n' },
-          ];
-        }
-        if (args[0] === 'install' || args[0] === 'i') {
-          return [
-            { type: 'info', content: '\nadded 523 packages in 8s\n' },
-            { type: 'success', content: '✓ Packages installed successfully\n' },
-          ];
-        }
-        return [{ type: 'output', content: 'Usage: npm run dev | npm start | npm install' }];
-      
+        await runFile(args[0]);
+        return;
+
       case 'node':
-        if (args.length === 0) {
-          return [{ type: 'error', content: 'Usage: node <filename.js>' }];
-        }
-        return executeJS(args[0]);
-      
+        if (!args[0]) { write('stderr', 'usage: node <file.js>'); return; }
+        await runFile(args[0], /\.(js|mjs|cjs|jsx|ts|tsx)$/i);
+        return;
+
       case 'python':
       case 'python3':
-        if (args.length === 0) {
-          return [{ type: 'error', content: 'Usage: python <filename.py>' }];
-        }
-        return executePython(args[0]);
-      
-      case 'run':
-        if (args.length === 0) {
-          return [{ type: 'error', content: 'Usage: run <filename>' }];
-        }
-        const ext = args[0].split('.').pop()?.toLowerCase();
-        if (ext === 'js' || ext === 'ts') {
-          return executeJS(args[0]);
-        } else if (ext === 'py') {
-          return executePython(args[0]);
-        }
-        return [{ type: 'error', content: `Cannot run .${ext} files. Supported: .js, .ts, .py` }];
-      
-      case 'open':
-        if (args.length === 0) {
-          return [{ type: 'error', content: 'Usage: open <url>' }];
-        }
-        const url = args[0].startsWith('http') ? args[0] : `https://${args[0]}`;
+        if (!args[0]) { write('stderr', 'usage: python <file.py>'); return; }
+        await runFile(args[0], /\.py$/i);
+        return;
+
+      case 'gcc':
+      case 'cc':
+        if (!args[0]) { write('stderr', 'usage: gcc <file.c>'); return; }
+        await runFile(args[0], /\.c$/i);
+        return;
+
+      case 'g++':
+      case 'clang++':
+        if (!args[0]) { write('stderr', 'usage: g++ <file.cpp>'); return; }
+        await runFile(args[0], /\.(cpp|cc|cxx)$/i);
+        return;
+
+      case 'java':
+        if (!args[0]) { write('stderr', 'usage: java <file.java>'); return; }
+        await runFile(args[0], /\.java$/i);
+        return;
+
+      case 'open': {
+        if (!args[0]) { write('stderr', 'usage: open <url>'); return; }
+        const url = /^https?:\/\//.test(args[0]) ? args[0] : `https://${args[0]}`;
         openSimpleBrowser(url);
-        return [{ type: 'success', content: `Opening ${url}...` }];
-      
-      case '':
-        return [];
-      
-      default:
-        return [{ type: 'error', content: `Command not found: ${command}. Type "help" for available commands.` }];
-    }
-  };
-  
-  // Execute JavaScript code
-  const executeJS = (filename: string): TerminalLine[] => {
-    const code = userFiles[filename];
-    if (!code) {
-      return [{ type: 'error', content: `File not found: ${filename}` }];
-    }
-    
-    try {
-      // Create a safe console.log capture
-      const logs: string[] = [];
-      const mockConsole = {
-        log: (...args: unknown[]) => logs.push(args.map(a => String(a)).join(' ')),
-        error: (...args: unknown[]) => logs.push(`Error: ${args.map(a => String(a)).join(' ')}`),
-        warn: (...args: unknown[]) => logs.push(`Warning: ${args.map(a => String(a)).join(' ')}`),
-      };
-      
-      // Execute code with mock console
-      const fn = new Function('console', code);
-      fn(mockConsole);
-      
-      if (logs.length === 0) {
-        return [{ type: 'success', content: '(executed with no output)' }];
+        write('success', `Opening ${url}`);
+        return;
       }
-      
-      return logs.map(log => ({ type: 'output' as const, content: log }));
-    } catch (err) {
-      return [{ type: 'error', content: `Error: ${(err as Error).message}` }];
-    }
-  };
-  
-  // Execute Python code (simulated)
-  const executePython = (filename: string): TerminalLine[] => {
-    const code = userFiles[filename];
-    if (!code) {
-      return [{ type: 'error', content: `File not found: ${filename}` }];
-    }
-    
-    // Simple Python interpreter simulation
-    const lines_: string[] = [];
-    const codeLines = code.split('\n');
-    
-    for (const line of codeLines) {
-      const trimmed = line.trim();
-      
-      // Handle print statements
-      const printMatch = trimmed.match(/^print\s*\(\s*["'](.*)["']\s*\)$/);
-      if (printMatch) {
-        lines_.push(printMatch[1]);
-        continue;
-      }
-      
-      // Handle print with f-string or variables (simplified)
-      const printMatch2 = trimmed.match(/^print\s*\((.*)\)$/);
-      if (printMatch2) {
-        try {
-          // Evaluate simple expressions
-          const expr = printMatch2[1].replace(/["']/g, '');
-          lines_.push(expr);
-        } catch {
-          lines_.push(printMatch2[1]);
+
+      case 'npm':
+        if (args[0] === 'run' && (args[1] === 'dev' || args[1] === 'start')) {
+          write('info', '\n> anubhav-portfolio@2.0.0 dev');
+          write('info', '> next dev\n');
+          write('stdout', '  ▲ Next.js');
+          write('stdout', '  - Local:  /portfolio');
+          write('success', '  ✓ Ready\n');
+          openSimpleBrowser('/portfolio');
+          return;
         }
+        if (args[0] === 'install' || args[0] === 'i') {
+          write('stderr', 'This shell has no package registry — it runs single files, not projects.');
+          write('info', 'Type `langs` to see what it can run.');
+          return;
+        }
+        write('stdout', 'usage: npm run dev');
+        return;
+
+      case 'whoami':
+        write('stdout', 'guest@anubhav-portfolio');
+        return;
+
+      case 'pwd':
+        write('stdout', '/home/guest/anubhav-portfolio');
+        return;
+
+      case 'date':
+        write('stdout', new Date().toString());
+        return;
+
+      case 'echo':
+        write('stdout', args.join(' '));
+        return;
+
+      case 'neofetch':
+        write('stdout', NEOFETCH);
+        return;
+
+      case 'exit':
+        toggleTerminal();
+        return;
+
+      default: {
+        // Suggest the closest command rather than just failing.
+        const known = ['help', 'about', 'products', 'projects', 'skills', 'contact', 'run',
+          'node', 'python', 'ls', 'cat', 'edit', 'clear', 'langs', 'open', 'resume'];
+        const near = known.find((k) => k.startsWith(cmd.slice(0, 2)) && cmd.length > 1);
+        write('stderr', `${cmd}: command not found`);
+        if (near) write('info', `Did you mean \`${near}\`?`);
+        else write('info', "Type 'help' for the command list.");
       }
     }
-    
-    if (lines_.length === 0) {
-      return [{ type: 'success', content: '(executed with no output)' }];
-    }
-    
-    return lines_.map(l => ({ type: 'output' as const, content: l }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
-
-    const result = processCommand(input);
-    
-    // Check if clear command was executed
-    if (result.length === 1 && result[0].content === '__CLEAR__') {
-      setLines([]);
-    } else {
-      const newLines: TerminalLine[] = [
-        ...lines,
-        { type: 'input', content: `$ ${input}` },
-        ...result,
-      ];
-      setLines(newLines);
-    }
-
-    setHistory([...history, input]);
+    const raw = input;
+    if (!raw.trim()) return;
+    write('input', `$ ${raw}`);
+    setHistory((h) => [...h, raw]);
     setHistoryIndex(-1);
     setInput('');
+    await execute(raw);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (historyIndex < history.length - 1) {
-        const newIndex = historyIndex + 1;
-        setHistoryIndex(newIndex);
-        setInput(history[history.length - 1 - newIndex]);
+        const next = historyIndex + 1;
+        setHistoryIndex(next);
+        setInput(history[history.length - 1 - next]);
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInput(history[history.length - 1 - newIndex]);
+        const next = historyIndex - 1;
+        setHistoryIndex(next);
+        setInput(history[history.length - 1 - next]);
       } else if (historyIndex === 0) {
         setHistoryIndex(-1);
         setInput('');
       }
+    } else if (e.key === 'Tab') {
+      // Complete a filename argument, or the command itself.
+      e.preventDefault();
+      const parts = input.split(/\s+/);
+      if (parts.length > 1) {
+        const partial = parts[parts.length - 1];
+        const match = allFilenames().find((f) => f.toLowerCase().startsWith(partial.toLowerCase()));
+        if (match) setInput([...parts.slice(0, -1), match].join(' '));
+      }
+    } else if (e.key === 'c' && e.ctrlKey && running) {
+      e.preventDefault();
+      stop();
     }
   };
 
   if (!terminalOpen) return null;
 
-  const currentHeight = isMaximized ? '60vh' : `${terminalHeight}px`;
+  const kindClass: Record<LineKind, string> = {
+    input: 'stream-input',
+    stdout: 'stream-stdout',
+    stderr: 'stream-stderr',
+    info: 'stream-info',
+    success: 'stream-success',
+    system: 'stream-info',
+  };
+
+  const problemCount = 0;
 
   return (
-    <section 
-      className="bg-[var(--bg-terminal)] border-t border-[var(--border-color)] flex flex-col"
-      style={{ height: currentHeight, minHeight: '100px' }}
+    <section
+      className="flex flex-col shrink-0"
+      style={{
+        height: isMaximized ? '70vh' : `${terminalHeight}px`,
+        minHeight: '120px',
+        background: 'var(--bg-terminal)',
+        borderTop: '1px solid var(--border-color)',
+      }}
     >
-      {/* Resize Handle */}
-      <div 
-        className="h-1 cursor-ns-resize bg-transparent hover:bg-[var(--accent-primary)] transition-colors flex-shrink-0 group"
-        onMouseDown={handleMouseDown}
+      {/* Resize handle */}
+      <div
+        className="h-1 cursor-ns-resize shrink-0 group flex items-center justify-center"
+        onMouseDown={startDrag}
       >
-        <div className="h-full w-full flex items-center justify-center">
-          <div className="w-10 h-0.5 bg-[var(--border-color)] group-hover:bg-[var(--accent-primary)] rounded transition-colors" />
-        </div>
+        <div
+          className="w-10 h-0.5 rounded transition-colors group-hover:bg-[var(--accent-primary)]"
+          style={{ background: 'var(--border-color)' }}
+        />
       </div>
 
-      {/* Terminal Header/Tabs */}
-      <div className="flex items-center justify-between h-9 px-2 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] flex-shrink-0">
+      {/* Panel tabs */}
+      <div
+        className="flex items-center justify-between h-9 px-2 shrink-0"
+        style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}
+      >
         <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none">
-          <button 
-            onClick={() => setActiveTab('terminal')}
-            className={cn(
-              "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px whitespace-nowrap",
-              activeTab === 'terminal' 
-                ? "text-[var(--text-primary)] border-[var(--accent-primary)] bg-[var(--bg-terminal)]" 
-                : "text-[var(--text-muted)] border-transparent hover:text-[var(--text-primary)]"
-            )}
-          >
-            <TerminalIcon size={14} />
-            <span className="hidden sm:inline">TERMINAL</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab('problems')}
-            className={cn(
-              "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px whitespace-nowrap",
-              activeTab === 'problems' 
-                ? "text-[var(--text-primary)] border-[var(--accent-primary)] bg-[var(--bg-terminal)]" 
-                : "text-[var(--text-muted)] border-transparent hover:text-[var(--text-primary)]"
-            )}
-          >
-            <Bug size={14} />
-            <span className="hidden sm:inline">PROBLEMS</span>
-            <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-[var(--bg-tertiary)] rounded">0</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab('output')}
-            className={cn(
-              "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-xs transition-colors border-b-2 -mb-px whitespace-nowrap",
-              activeTab === 'output' 
-                ? "text-[var(--text-primary)] border-[var(--accent-primary)] bg-[var(--bg-terminal)]" 
-                : "text-[var(--text-muted)] border-transparent hover:text-[var(--text-primary)]"
-            )}
-          >
-            <FileOutput size={14} />
-            <span className="hidden sm:inline">OUTPUT</span>
-          </button>
+          {([
+            ['terminal', TerminalIcon, 'TERMINAL'],
+            ['problems', Bug, 'PROBLEMS'],
+            ['output', FileOutput, 'OUTPUT'],
+          ] as const).map(([id, Icon, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={cn(
+                'flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs border-b-2 -mb-px whitespace-nowrap transition-colors',
+                tab === id ? 'border-[var(--accent-primary)]' : 'border-transparent'
+              )}
+              style={{ color: tab === id ? 'var(--text-primary)' : 'var(--text-muted)' }}
+            >
+              <Icon size={14} />
+              <span className="hidden sm:inline">{label}</span>
+              {id === 'problems' && (
+                <span
+                  className="ml-1 px-1.5 py-0.5 text-[10px] rounded"
+                  style={{ background: 'var(--bg-tertiary)' }}
+                >
+                  {problemCount}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
+
         <div className="flex items-center gap-0.5 shrink-0">
-          <button 
-            onClick={addNewTerminal}
-            className="hidden sm:flex p-1.5 hover:bg-[var(--bg-hover)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            title="New Terminal"
+          {running && (
+            <span className="hidden sm:flex items-center gap-1.5 mr-2 text-[11px]" style={{ color: 'var(--success)' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--success)' }} />
+              running
+            </span>
+          )}
+          <button
+            onClick={() => setShowStdin((s) => !s)}
+            title="Program input (stdin)"
+            className="p-1.5 rounded hover:bg-[var(--bg-hover)]"
+            style={{ color: showStdin ? 'var(--accent-primary)' : 'var(--text-muted)' }}
           >
-            <Plus size={14} />
+            <Keyboard size={14} />
           </button>
-          <button className="hidden sm:flex p-1.5 hover:bg-[var(--bg-hover)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-            <ChevronDown size={14} />
-          </button>
-          <div className="hidden sm:block w-px h-4 bg-[var(--border-color)] mx-1" />
-          <button 
-            onClick={() => setLines([])}
-            className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            title="Clear"
-          >
+          <button onClick={clear} title="Clear terminal" className="p-1.5 rounded hover:bg-[var(--bg-hover)]" style={{ color: 'var(--text-muted)' }}>
             <Trash2 size={14} />
           </button>
-          <button 
-            onClick={() => setIsMaximized(!isMaximized)}
-            className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            title={isMaximized ? "Restore" : "Maximize"}
+          <button
+            onClick={() => setIsMaximized((m) => !m)}
+            title={isMaximized ? 'Restore panel' : 'Maximise panel'}
+            className="p-1.5 rounded hover:bg-[var(--bg-hover)]"
+            style={{ color: 'var(--text-muted)' }}
           >
             {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button 
-            onClick={toggleTerminal}
-            className="p-1.5 hover:bg-[var(--bg-hover)] rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            title="Close Panel"
-          >
+          <button onClick={toggleTerminal} title="Close panel" className="p-1.5 rounded hover:bg-[var(--bg-hover)]" style={{ color: 'var(--text-muted)' }}>
             <X size={14} />
           </button>
         </div>
       </div>
 
-      {/* Terminal Content */}
-      {activeTab === 'terminal' && (
-        <div 
+      {/* stdin drawer */}
+      {showStdin && tab === 'terminal' && (
+        <div className="px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
+          <label className="block text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>
+            stdin — what the next program reads from input
+          </label>
+          <textarea
+            value={stdin}
+            onChange={(e) => setStdin(e.target.value)}
+            rows={2}
+            spellCheck={false}
+            placeholder={'One value per line.\nRead with input() in Python, readline() in JS.'}
+            className="w-full px-2 py-1 text-[12px] rounded outline-none resize-y font-mono"
+            style={{
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-color)',
+            }}
+          />
+        </div>
+      )}
+
+      {tab === 'terminal' && (
+        <div
           ref={outputRef}
-          className="flex-1 overflow-auto p-3 font-mono text-sm min-h-0"
+          className="flex-1 overflow-auto p-3 font-mono text-[13px] min-h-0"
           onClick={() => inputRef.current?.focus()}
         >
-          {lines.map((line, idx) => (
-            <div 
-              key={idx} 
-              className={cn(
-                "whitespace-pre-wrap leading-5",
-                line.type === 'input' && "text-[var(--text-primary)]",
-                line.type === 'output' && "text-[var(--text-secondary)]",
-                line.type === 'error' && "text-[var(--error)]",
-                line.type === 'success' && "text-[var(--accent-tertiary)]",
-                line.type === 'info' && "text-[var(--accent-primary)]",
-              )}
-            >
-              {renderLineContent(line.content)}
+          {lines.map((line) => (
+            <div key={line.id} className={cn('whitespace-pre-wrap break-words leading-5', kindClass[line.kind])}>
+              {line.text || ' '}
             </div>
           ))}
-          
-          {/* Input Line */}
-          <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-1">
-            <span className="text-[var(--terminal-prompt)] font-semibold">anubhav@portfolio:~$</span>
+
+          <form onSubmit={onSubmit} className="flex items-center gap-2 mt-1">
+            <span className="shrink-0 font-semibold" style={{ color: 'var(--terminal-prompt)' }}>
+              guest@portfolio
+            </span>
+            <ChevronRight size={14} className="shrink-0 -ml-1" style={{ color: 'var(--terminal-prompt)' }} />
             <input
               ref={inputRef}
-              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1 bg-transparent outline-none text-[var(--text-primary)] caret-[var(--accent-primary)]"
-              autoFocus
+              onKeyDown={onKeyDown}
+              disabled={running}
+              placeholder={running ? 'running — Ctrl+C to stop' : ''}
+              className="flex-1 bg-transparent outline-none disabled:opacity-50"
+              style={{ color: 'var(--text-primary)', caretColor: 'var(--accent-primary)' }}
               spellCheck={false}
+              autoComplete="off"
+              aria-label="Terminal input"
             />
           </form>
         </div>
       )}
 
-      {activeTab === 'problems' && (
-        <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">
-          No problems detected ✓
+      {tab === 'problems' && (
+        <div className="flex-1 flex items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
+          No problems have been detected in the workspace.
         </div>
       )}
 
-      {activeTab === 'output' && (
-        <div className="flex-1 p-3 font-mono text-sm text-[var(--text-muted)]">
-          [Portfolio] Ready to serve at localhost:3000
+      {tab === 'output' && (
+        <div className="flex-1 p-3 font-mono text-[12px] overflow-auto" style={{ color: 'var(--text-muted)' }}>
+          <div>[workspace] {Object.keys(fileContents).length} files loaded</div>
+          <div>[runtime]   JavaScript / TypeScript — Web Worker, ready</div>
+          <div>[runtime]   Python — Pyodide, loads on first use</div>
+          <div>[runtime]   C / C++ / Java / Go / Rust — remote sandbox</div>
+          <div>[preview]   Simple Browser ready</div>
         </div>
       )}
     </section>
