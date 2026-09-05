@@ -1,777 +1,525 @@
-// File content for the IDE editor - Portfolio source code files
+// The virtual filesystem shown in the IDE.
+//
+// Two kinds of file live here:
+//   - content files, generated from portfolioData so they can never drift out of sync
+//   - playground files, which are real programs the visitor can actually execute
+//
+import { portfolioData } from './portfolio';
 
-export const fileContents: Record<string, string> = {
-  "README.md": `# 👋 Anubhav Mishra - Portfolio IDE
+const { personal, contact, products, projects, skills, currentFocus, impact, stackLayers } =
+  portfolioData;
 
-## About This Project
+/* ------------------------------------------------------------------ *
+ * Generated content files
+ * ------------------------------------------------------------------ */
 
-This is my **VS Code-style portfolio website** built with modern web technologies.
-It showcases my work as a Full-Stack Developer & Systems Engineer.
+const readme = `# ${personal.name}
 
-## 🛠️ Tech Stack
+**${personal.title}** — ${personal.subtitle}
+${personal.location} · ${personal.timezone}
 
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **State**: Zustand
-- **Icons**: Lucide React
+${personal.tagline}
 
-## 🎯 Features
+## At a glance
 
-- ✅ VS Code-like interface
-- ✅ File explorer with syntax highlighting
-- ✅ Interactive terminal
-- ✅ Dark/Light theme toggle
-- ✅ Command palette (Ctrl+Shift+P)
-- ✅ In-IDE browser for live preview
-- ✅ Responsive design
+${impact.map((i) => `- **${i.value}** — ${i.label}`).join('\n')}
 
-## 📂 Project Structure
+## Live in production
 
-\`\`\`
-src/
-├── app/
-│   ├── page.tsx          # Main entry
-│   ├── layout.tsx        # Root layout
-│   ├── globals.css       # Global styles
-│   └── portfolio/        # Portfolio preview page
-├── components/
-│   ├── TitleBar.tsx      # VS Code title bar
-│   ├── ActivityBar.tsx   # Left icon bar
-│   ├── Sidebar.tsx       # File explorer
-│   ├── Editor.tsx        # Code editor
-│   ├── Terminal.tsx      # Interactive terminal
-│   └── StatusBar.tsx     # Bottom status bar
-├── store/
-│   ├── editor.ts         # Editor state
-│   └── theme.ts          # Theme state
-└── data/
-    ├── portfolio.ts      # Portfolio data
-    └── files.ts          # File contents
-\`\`\`
+Things you can go and look at right now — not demos, not screenshots.
 
-## 👤 About Me
+${products
+  .filter((p) => p.url)
+  .map((p) => `- **${p.name}** — ${p.tagline}\n  ${p.url}${p.note ? ` _(${p.note})_` : ''}`)
+  .join('\n')}
 
-**Anubhav Mishra** - Final Year B.Tech CSE Student
+## Where I actually work
 
-🔧 Systems Enthusiast | Full-Stack Developer | OS & Compiler Builder
+${stackLayers.map((l) => `- **${l.layer}** — ${l.detail}`).join('\n')}
 
-## 📫 Contact
+> ${personal.pitch.replace(/\n/g, '\n> ')}
 
-- Email: anubhav09.work@gmail.com
-- GitHub: github.com/anubhav-n-mishra
+## Right now
+
+${currentFocus.map((f) => `- ${f}`).join('\n')}
+
+## Reach me
+
+- Email: ${contact.email}
+- GitHub: ${contact.githubUser}
 - LinkedIn: linkedin.com/in/anubhav-mishra0
-`,
+- Web: ${contact.website}
 
-  "page.tsx": `import IDELayout from '@/components/IDELayout';
+---
 
-export default function Home() {
-  return <IDELayout />;
-}
-`,
+_${personal.availability}. ${personal.overlap}. ${personal.responseTime}._
+`;
 
-  "layout.tsx": `import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
-import "./globals.css";
+const about = `# About
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
+${personal.bio}
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-});
+## Education
 
-export const metadata: Metadata = {
-  title: "Anubhav Mishra | Portfolio IDE",
-  description: "Full-Stack Developer & Systems Engineer Portfolio",
-  keywords: ["Anubhav Mishra", "Portfolio", "Developer"],
-};
+${personal.education.degree}
+${personal.education.university} — ${personal.education.status}
 
-export default function RootLayout({
-  children,
-}: { children: React.ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={\`\${inter.variable} \${jetbrainsMono.variable}\`}>
-        {children}
-      </body>
-    </html>
-  );
-}
-`,
+## What I like working on
 
-  "globals.css": `@import "tailwindcss";
+${portfolioData.interests.map((i) => `- ${i}`).join('\n')}
 
-/* VS Code Theme Variables */
-:root {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252526;
-  --bg-tertiary: #2d2d2d;
-  --bg-titlebar: #323233;
-  --bg-activitybar: #181818;
-  --bg-sidebar: #252526;
-  --bg-editor: #1e1e1e;
-  --bg-terminal: #1a1a1a;
-  --bg-statusbar: #007acc;
-  --text-primary: #cccccc;
-  --text-secondary: #9d9d9d;
-  --text-muted: #6e6e6e;
-  --accent-primary: #007acc;
-  --border-color: #3c3c3c;
-}
+## How I work
 
-.light {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f3f3f3;
-  --bg-titlebar: #dddddd;
-  --text-primary: #1e1e1e;
-  --accent-primary: #007acc;
-}
+I care about the layer where correctness is actually enforced. A permission that lives
+in a React component is a suggestion; the same rule as a row-level-security policy is a
+guarantee. Most of the interesting decisions in the products below come from taking that
+seriously — and from being honest in the repo about what is built and what is not.
+`;
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+const stack = `# Stack, sorted honestly
 
-body {
-  font-family: 'Inter', sans-serif;
-  overflow: hidden;
-  height: 100vh;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-`,
+## ${skills.confident.label}
 
-  "IDELayout.tsx": `'use client';
+${skills.confident.items.map((s) => `- ${s}`).join('\n')}
 
-import React, { useEffect, useState } from 'react';
-import { useThemeStore } from '@/store/theme';
-import { useEditorStore } from '@/store/editor';
-import TitleBar from './TitleBar';
-import ActivityBar from './ActivityBar';
-import Sidebar from './Sidebar';
-import Editor from './Editor';
-import Terminal from './Terminal';
-import StatusBar from './StatusBar';
-import SimpleBrowser from './SimpleBrowser';
+## ${skills.shipped.label}
 
-export default function IDELayout() {
-  const { theme } = useThemeStore();
-  const { sidebarOpen, simpleBrowserOpen } = useEditorStore();
-  const [mounted, setMounted] = useState(false);
+${skills.shipped.items.map((s) => `- ${s}`).join('\n')}
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+## ${skills.learning.label}
 
-  if (!mounted) return null;
+${skills.learning.items.map((s) => `- ${s}`).join('\n')}
+`;
 
-  return (
-    <div className={\`h-screen w-screen flex flex-col \${theme === 'light' && 'light'}\`}>
-      <TitleBar />
-      <main className="flex-1 flex overflow-hidden">
-        <ActivityBar />
-        {sidebarOpen && <Sidebar />}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex">
-            <Editor />
-            {simpleBrowserOpen && <SimpleBrowser />}
-          </div>
-          <Terminal />
-        </div>
-      </main>
-      <StatusBar />
-    </div>
-  );
-}
-`,
-
-  "TitleBar.tsx": `'use client';
-
-import React from 'react';
-import { useThemeStore } from '@/store/theme';
-import { useEditorStore } from '@/store/editor';
-import { Code2, Search, Minus, Square, X } from 'lucide-react';
-
-// Menu items: File, Edit, Selection, View, Go, Terminal, Help
-const menuItems = ['File', 'Edit', 'Selection', 'View', 'Go', 'Terminal', 'Help'];
-
-export default function TitleBar() {
-  const { theme, toggleTheme } = useThemeStore();
-  const { openCommandPalette } = useEditorStore();
-
-  return (
-    <header className="h-[35px] flex items-center bg-[var(--bg-titlebar)]">
-      {/* Logo */}
-      <div className="w-12 flex items-center justify-center">
-        <Code2 size={18} className="text-[var(--accent-primary)]" />
-      </div>
-
-      {/* Menu Bar */}
-      <nav className="flex items-center h-full">
-        {menuItems.map(item => (
-          <button key={item} className="px-2 text-[13px] hover:bg-white/10">
-            {item}
-          </button>
-        ))}
-      </nav>
-
-      {/* Search Bar */}
-      <div className="flex-1 flex justify-center px-4">
-        <div 
-          onClick={openCommandPalette}
-          className="flex items-center h-[26px] px-3 rounded cursor-pointer"
-          style={{ background: 'var(--bg-tertiary)' }}
-        >
-          <Search size={14} className="mr-2 text-[var(--text-muted)]" />
-          <span className="text-[13px] text-[var(--text-muted)]">
-            anubhav-portfolio
-          </span>
-        </div>
-      </div>
-
-      {/* Window Controls */}
-      <div className="flex items-center h-full ml-auto">
-        <button className="w-[46px] h-full flex items-center justify-center hover:bg-white/10">
-          <Minus size={16} />
-        </button>
-        <button className="w-[46px] h-full flex items-center justify-center hover:bg-white/10">
-          <Square size={12} />
-        </button>
-        <button className="w-[46px] h-full flex items-center justify-center hover:bg-red-600">
-          <X size={16} />
-        </button>
-      </div>
-    </header>
-  );
-}
-`,
-
-  "ActivityBar.tsx": `'use client';
-
-import React from 'react';
-import { useEditorStore } from '@/store/editor';
-import { Files, Search, GitBranch, Puzzle, Bot, User, Settings } from 'lucide-react';
-
-const activityItems = [
-  { id: 'explorer', icon: Files, label: 'Explorer' },
-  { id: 'search', icon: Search, label: 'Search' },
-  { id: 'git', icon: GitBranch, label: 'Source Control', badge: '3' },
-  { id: 'extensions', icon: Puzzle, label: 'Extensions' },
-  { id: 'ai', icon: Bot, label: 'AI Assistant' },
-];
-
-export default function ActivityBar() {
-  const { sidebarPanel, setSidebarPanel } = useEditorStore();
-
-  return (
-    <aside className="w-12 bg-[var(--bg-activitybar)] flex flex-col justify-between">
-      <div className="flex flex-col items-center">
-        {activityItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setSidebarPanel(item.id)}
-            className={\`w-12 h-12 flex items-center justify-center relative
-              \${sidebarPanel === item.id ? 'text-white' : 'text-[var(--text-muted)]'}\`}
-          >
-            {sidebarPanel === item.id && (
-              <div className="absolute left-0 w-0.5 h-6 bg-white" />
-            )}
-            <item.icon size={24} strokeWidth={1.5} />
-            {item.badge && (
-              <span className="absolute -top-1 -right-1 bg-[var(--accent-primary)] 
-                text-white text-[10px] rounded-full px-1">
-                {item.badge}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col items-center pb-2">
-        <button className="w-12 h-12 flex items-center justify-center text-[var(--text-muted)]">
-          <User size={24} strokeWidth={1.5} />
-        </button>
-        <button className="w-12 h-12 flex items-center justify-center text-[var(--text-muted)]">
-          <Settings size={24} strokeWidth={1.5} />
-        </button>
-      </div>
-    </aside>
-  );
-}
-`,
-
-  "Sidebar.tsx": `'use client';
-
-import React from 'react';
-import { useEditorStore, TreeNode } from '@/store/editor';
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText } from 'lucide-react';
-
-// File tree component
-const TreeItem: React.FC<{ node: TreeNode; depth: number }> = ({ node, depth }) => {
-  const { openFile, toggleFolder, activeFile } = useEditorStore();
-  const isActive = node.type === 'file' && node.name === activeFile;
-
-  const handleClick = () => {
-    if (node.type === 'folder') {
-      toggleFolder(node.path);
-    } else {
-      openFile(node.name);
-    }
-  };
-
-  return (
-    <div>
-      <div
-        onClick={handleClick}
-        className={\`flex items-center gap-1 py-[2px] cursor-pointer hover:bg-[var(--bg-hover)]
-          \${isActive ? 'bg-[var(--bg-selected)]' : ''}\`}
-        style={{ paddingLeft: depth * 8 + 8 }}
-      >
-        {node.type === 'folder' ? (
-          <>
-            {node.isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            {node.isOpen ? <FolderOpen size={16} /> : <Folder size={16} />}
-          </>
-        ) : (
-          <>
-            <span className="w-4" />
-            <FileText size={16} />
-          </>
-        )}
-        <span className="text-[13px]">{node.name}</span>
-      </div>
-      {node.type === 'folder' && node.isOpen && node.children?.map((child) => (
-        <TreeItem key={child.id} node={child} depth={depth + 1} />
-      ))}
-    </div>
-  );
-};
-
-export default function Sidebar() {
-  const { fileTree, sidebarPanel } = useEditorStore();
-
-  if (sidebarPanel !== 'explorer') return null;
-
-  return (
-    <aside className="w-[260px] bg-[var(--bg-sidebar)] border-r border-[var(--border-color)]">
-      <div className="px-4 py-2 text-[11px] font-semibold uppercase">Explorer</div>
-      <div className="text-[13px]">
-        {fileTree.map((node) => (
-          <TreeItem key={node.id} node={node} depth={0} />
-        ))}
-      </div>
-    </aside>
-  );
-}
-`,
-
-  "Editor.tsx": `'use client';
-
-import React from 'react';
-import { useEditorStore } from '@/store/editor';
-import { getFileContent } from '@/data/files';
-import { X } from 'lucide-react';
-
-export default function Editor() {
-  const { tabs, activeFile, closeFile, setActiveFile } = useEditorStore();
-  const content = activeFile ? getFileContent(activeFile) : '';
-  const lines = content.split('\\n');
-
-  return (
-    <div className="flex-1 flex flex-col bg-[var(--bg-editor)]">
-      {/* Tabs */}
-      <div className="flex bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            onClick={() => setActiveFile(tab.name)}
-            className={\`flex items-center gap-2 px-3 py-2 cursor-pointer border-r
-              \${tab.isActive ? 'bg-[var(--bg-editor)]' : 'bg-[var(--bg-secondary)]'}\`}
-          >
-            <span className="text-[13px]">{tab.name}</span>
-            <X
-              size={14}
-              onClick={(e) => { e.stopPropagation(); closeFile(tab.name); }}
-              className="hover:bg-white/10 rounded"
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Code Area */}
-      <div className="flex-1 overflow-auto font-mono text-[13px]">
-        {lines.map((line, idx) => (
-          <div key={idx} className="flex hover:bg-[var(--bg-hover)]">
-            <span className="w-12 text-right pr-4 text-[var(--text-muted)] select-none">
-              {idx + 1}
-            </span>
-            <pre className="flex-1">{line || ' '}</pre>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-`,
-
-  "Terminal.tsx": `'use client';
-
-import React, { useState } from 'react';
-import { useEditorStore } from '@/store/editor';
-
-const commands: Record<string, string> = {
-  help: 'Available: help, about, skills, projects, contact, clear',
-  about: 'Anubhav Mishra - Full-Stack Developer & Systems Engineer',
-  skills: 'C, C++, Python, JavaScript, TypeScript, React, Node.js, Next.js',
-  projects: 'ARGON OS, CineWave, GRAN Compiler',
-  contact: 'Email: anubhav09.work@gmail.com | GitHub: anubhav-n-mishra',
-};
-
-export default function Terminal() {
-  const { terminalOpen } = useEditorStore();
-  const [history, setHistory] = useState<string[]>([
-    'Welcome to Anubhav\\'s Portfolio Terminal v1.0.0',
-    'Type "help" for available commands.',
-  ]);
-  const [input, setInput] = useState('');
-
-  if (!terminalOpen) return null;
-
-  const handleCommand = (e: React.KeyboardEvent) => {
-    if (e.key !== 'Enter') return;
-    
-    const cmd = input.trim().toLowerCase();
-    const output = cmd === 'clear' ? [] : [
-      ...history,
-      \`anubhav@portfolio:~$ \${input}\`,
-      commands[cmd] || \`Command not found: \${cmd}\`,
-    ];
-    
-    setHistory(output);
-    setInput('');
-  };
-
-  return (
-    <div className="h-[200px] bg-[var(--bg-terminal)] border-t border-[var(--border-color)]">
-      <div className="flex items-center px-4 py-1 border-b border-[var(--border-color)]">
-        <span className="text-[13px]">TERMINAL</span>
-      </div>
-      <div className="p-2 font-mono text-[13px] overflow-auto h-[calc(100%-30px)]">
-        {history.map((line, i) => (
-          <div key={i} className="text-[var(--text-primary)]">{line}</div>
-        ))}
-        <div className="flex">
-          <span className="text-[#4ec9b0]">anubhav@portfolio:~$</span>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleCommand}
-            className="flex-1 ml-2 bg-transparent outline-none"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-`,
-
-  "StatusBar.tsx": `'use client';
-
-import React from 'react';
-import { useEditorStore } from '@/store/editor';
-import { GitBranch } from 'lucide-react';
-
-export default function StatusBar() {
-  const { activeFile } = useEditorStore();
-  
-  const getLanguage = (filename: string | null) => {
-    if (!filename) return 'Plain Text';
-    const ext = filename.split('.').pop();
-    const langs: Record<string, string> = {
-      tsx: 'TypeScript React',
-      ts: 'TypeScript',
-      js: 'JavaScript',
-      json: 'JSON',
-      md: 'Markdown',
-      css: 'CSS',
-    };
-    return langs[ext || ''] || 'Plain Text';
-  };
-
-  return (
-    <footer className="h-[22px] flex items-center justify-between px-2 
-      bg-[var(--bg-statusbar)] text-white text-[12px]">
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1">
-          <GitBranch size={14} />
-          main
-        </span>
-      </div>
-      <div className="flex items-center gap-3">
-        <span>Ln 1, Col 1</span>
-        <span>UTF-8</span>
-        <span>{getLanguage(activeFile)}</span>
-      </div>
-    </footer>
-  );
-}
-`,
-
-  "editor.ts": `import { create } from 'zustand';
-
-export interface FileTab {
-  id: string;
-  name: string;
-  path: string;
-  isActive: boolean;
-}
-
-export interface TreeNode {
-  id: string;
-  name: string;
-  type: 'file' | 'folder';
-  path: string;
-  children?: TreeNode[];
-  isOpen?: boolean;
-}
-
-interface EditorState {
-  tabs: FileTab[];
-  activeFile: string | null;
-  sidebarPanel: string;
-  sidebarOpen: boolean;
-  terminalOpen: boolean;
-  fileTree: TreeNode[];
-  
-  openFile: (filename: string) => void;
-  closeFile: (filename: string) => void;
-  setActiveFile: (filename: string) => void;
-  setSidebarPanel: (panel: string) => void;
-  toggleSidebar: () => void;
-  toggleTerminal: () => void;
-  toggleFolder: (path: string) => void;
-}
-
-export const useEditorStore = create<EditorState>((set, get) => ({
-  tabs: [{ id: 'readme', name: 'README.md', path: '/README.md', isActive: true }],
-  activeFile: 'README.md',
-  sidebarPanel: 'explorer',
-  sidebarOpen: true,
-  terminalOpen: true,
-  fileTree: [/* ... file tree structure ... */],
-  
-  openFile: (filename) => {
-    const { tabs } = get();
-    const exists = tabs.find(t => t.name === filename);
-    if (exists) {
-      set({ tabs: tabs.map(t => ({ ...t, isActive: t.name === filename })), activeFile: filename });
-    } else {
-      set({
-        tabs: [...tabs.map(t => ({ ...t, isActive: false })), 
-          { id: filename, name: filename, path: '/' + filename, isActive: true }],
-        activeFile: filename,
-      });
-    }
-  },
-  
-  closeFile: (filename) => { /* ... */ },
-  setActiveFile: (filename) => { /* ... */ },
-  setSidebarPanel: (panel) => set({ sidebarPanel: panel, sidebarOpen: true }),
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-  toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
-  toggleFolder: (path) => { /* ... */ },
-}));
-`,
-
-  "theme.ts": `import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-interface ThemeState {
-  theme: 'dark' | 'light';
-  antiGravity: boolean;
-  animations: boolean;
-  toggleTheme: () => void;
-  toggleAntiGravity: () => void;
-  toggleAnimations: () => void;
-}
-
-export const useThemeStore = create<ThemeState>()(
-  persist(
-    (set) => ({
-      theme: 'dark',
-      antiGravity: true,
-      animations: true,
-      toggleTheme: () => set((s) => ({ 
-        theme: s.theme === 'dark' ? 'light' : 'dark' 
-      })),
-      toggleAntiGravity: () => set((s) => ({ antiGravity: !s.antiGravity })),
-      toggleAnimations: () => set((s) => ({ animations: !s.animations })),
-    }),
-    { name: 'theme-storage' }
-  )
+const productsJson = JSON.stringify(
+  products.map((p) => ({
+    name: p.name,
+    tagline: p.tagline,
+    status: p.status,
+    url: p.url ?? null,
+    tech: p.tech,
+    highlights: p.highlights,
+  })),
+  null,
+  2
 );
-`,
 
-  "portfolio.ts": `// Portfolio data for Anubhav Mishra
+const projectsJson = JSON.stringify(
+  projects.map((p) => ({
+    name: p.name,
+    category: p.category,
+    description: p.description,
+    tech: p.tech,
+    repo: p.repo,
+    stars: p.stars ?? 0,
+    featured: p.featured,
+  })),
+  null,
+  2
+);
 
-export const portfolioData = {
-  personal: {
-    name: "Anubhav Mishra",
-    title: "Full-Stack Developer | Systems Engineer",
-    avatar: "https://avatars.githubusercontent.com/u/89638375?v=4",
-    education: {
-      degree: "B.Tech Computer Science Engineering",
-      university: "Graphic Era Hill University",
-      year: "Final Year (2025)",
-    },
-  },
-  
-  contact: {
-    email: "anubhav09.work@gmail.com",
-    github: "https://github.com/anubhav-n-mishra",
-    linkedin: "https://linkedin.com/in/anubhav-mishra0",
-  },
-  
-  skills: {
-    languages: ["C", "C++", "Java", "Python", "JavaScript", "TypeScript"],
-    frontend: ["React.js", "Next.js", "Tailwind CSS"],
-    backend: ["Node.js", "Express.js", "Supabase"],
-    databases: ["MongoDB", "MySQL", "PostgreSQL"],
-    systems: ["Operating Systems", "Compilers", "x86 Assembly"],
-  },
-  
-  projects: [
-    {
-      name: "ARGON OS",
-      description: "Custom x86 operating system with bootloader",
-      tech: ["C", "Assembly", "QEMU"],
-    },
-    {
-      name: "CineWave",
-      description: "Group watch streaming platform",
-      tech: ["React", "Node.js", "Supabase"],
-    },
-    {
-      name: "GRAN Compiler",
-      description: "Statically-typed language with LLVM backend",
-      tech: ["C++", "LLVM"],
-    },
-  ],
-  
-  github: {
-    contributions: 467,
-    repositories: 41,
-    achievements: ["Quickdraw", "YOLO", "Pull Shark"],
-  },
-};
-`,
+const contactTs = `// Every way to reach me, in one object.
 
-  "package.json": `{
-  "name": "anubhav-portfolio",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "next": "14.0.0",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "zustand": "^4.4.0",
-    "lucide-react": "^0.290.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.0.0",
-    "tailwindcss": "^3.4.0",
-    "@types/react": "^18.2.0",
-    "@types/node": "^20.0.0"
+export const contact = {
+  email: ${JSON.stringify(contact.email)},
+  github: ${JSON.stringify(contact.github)},
+  linkedin: ${JSON.stringify(contact.linkedin)},
+  website: ${JSON.stringify(contact.website)},
+  leetcode: ${JSON.stringify(contact.leetcode)},
+  location: ${JSON.stringify(personal.location)},
+  timezone: ${JSON.stringify(personal.timezone)},
+} as const;
+
+export const availability = {
+  status: ${JSON.stringify(personal.availability)},
+  overlap: ${JSON.stringify(personal.overlap)},
+  responseTime: ${JSON.stringify(personal.responseTime)},
+} as const;
+
+// Tip: this file runs. Hit the play button, or press Ctrl+Enter.
+console.log('Email:  ' + contact.email);
+console.log('GitHub: ' + contact.github);
+console.log('Status: ' + availability.status);
+`;
+
+/* ------------------------------------------------------------------ *
+ * Playground — real programs, meant to be executed
+ * ------------------------------------------------------------------ */
+
+const helloJs = `// Everything in playground/ actually runs.
+// Press the play button in the tab bar, or Ctrl+Enter.
+
+const stack = ['bootloader', 'compiler', 'desktop', 'API', 'database', 'product'];
+
+console.log('Six layers, bottom to top:');
+stack.forEach((layer, i) => {
+  console.log('  ' + String(i + 1).padStart(2) + '. ' + layer);
+});
+
+// Objects print properly here — this is a real console, not a string dump.
+console.log({
+  name: 'Anubhav Mishra',
+  role: 'Product Engineer',
+  shipped: stack.length,
+  live: true,
+});
+
+// Top-level await works too.
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+await wait(150);
+console.log('...and async/await works, because this is a real JS engine.');
+`;
+
+const rateLimiterTs = `// A token-bucket rate limiter — the shape used to tier the XTTS voice API.
+// TypeScript is transformed in the browser, then executed for real.
+
+interface Tier {
+  name: string;
+  capacity: number;      // burst size
+  refillPerSecond: number;
+}
+
+class TokenBucket {
+  private tokens: number;
+  private lastRefill: number;
+
+  constructor(private readonly tier: Tier) {
+    this.tokens = tier.capacity;
+    this.lastRefill = 0;
+  }
+
+  /** Returns true when the request is allowed at time \`now\` (seconds). */
+  tryConsume(now: number, cost = 1): boolean {
+    const elapsed = now - this.lastRefill;
+    this.tokens = Math.min(
+      this.tier.capacity,
+      this.tokens + elapsed * this.tier.refillPerSecond
+    );
+    this.lastRefill = now;
+
+    if (this.tokens < cost) return false;
+    this.tokens -= cost;
+    return true;
+  }
+
+  get remaining(): number {
+    return Math.floor(this.tokens);
   }
 }
-`,
 
-  ".gitignore": `# Dependencies
-node_modules/
+const free: Tier = { name: 'free', capacity: 5, refillPerSecond: 0.5 };
+const bucket = new TokenBucket(free);
 
-# Next.js
-.next/
-out/
-
-# Environment
-.env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Debug
-npm-debug.log*
-`,
-
-  "tsconfig.json": `{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+// Ten requests fired back to back at t=0, then one more a full second later.
+const timeline: Array<[number, string]> = [];
+for (let i = 0; i < 10; i++) {
+  timeline.push([0, bucket.tryConsume(0) ? 'allowed' : 'THROTTLED']);
 }
-`
+timeline.push([2, bucket.tryConsume(2) ? 'allowed' : 'THROTTLED']);
+
+timeline.forEach(([t, verdict], i) => {
+  console.log('req ' + String(i + 1).padStart(2) + '  t=' + t + 's  ' + verdict);
+});
+
+console.log('');
+console.log('Tokens left:', bucket.remaining);
+console.log('Burst of ' + free.capacity + ' absorbed, the rest shed. Refills at ' +
+  free.refillPerSecond + '/s.');
+`;
+
+const fizzbuzzPy = `# Real CPython, compiled to WebAssembly, running in your browser tab.
+# The first run downloads the interpreter; after that it is instant.
+
+import sys
+from collections import Counter
+
+
+def classify(n: int) -> str:
+    if n % 15 == 0:
+        return "FizzBuzz"
+    if n % 3 == 0:
+        return "Fizz"
+    if n % 5 == 0:
+        return "Buzz"
+    return str(n)
+
+
+results = [classify(n) for n in range(1, 31)]
+
+# Print in rows of ten so it stays readable.
+for row in range(0, len(results), 10):
+    print("  ".join(value.ljust(9) for value in results[row:row + 10]))
+
+print()
+print("Distribution:", dict(Counter(r for r in results if not r.isdigit())))
+print("Python", sys.version.split()[0], "— the real thing, not a simulation.")
+`;
+
+const analysisPy = `# The standard library is genuinely available. No install step, no server.
+
+import json
+import statistics
+from dataclasses import dataclass, asdict
+
+
+@dataclass
+class Deploy:
+    service: str
+    duration_s: float
+    rolled_back: bool
+
+
+deploys = [
+    Deploy("terra", 412.0, False),
+    Deploy("terra", 388.5, False),
+    Deploy("hive", 96.2, False),
+    Deploy("hive", 104.8, True),
+    Deploy("yaps", 41.0, False),
+    Deploy("yuitility", 63.7, False),
+    Deploy("yuitility", 58.1, False),
+    Deploy("pathshala", 121.4, True),
+]
+
+by_service: dict[str, list[float]] = {}
+for d in deploys:
+    by_service.setdefault(d.service, []).append(d.duration_s)
+
+print(f"{'service':<12}{'runs':>5}{'median':>10}{'spread':>10}")
+print("-" * 37)
+for service, times in sorted(by_service.items(), key=lambda kv: -statistics.median(kv[1])):
+    spread = max(times) - min(times)
+    print(f"{service:<12}{len(times):>5}{statistics.median(times):>10.1f}{spread:>10.1f}")
+
+rollbacks = [d for d in deploys if d.rolled_back]
+print()
+print(f"Rollback rate: {len(rollbacks) / len(deploys):.1%}")
+print(json.dumps([asdict(d) for d in rollbacks], indent=2))
+`;
+
+const twoSumCpp = `// C++ is compiled with a real g++ in a remote sandbox and the binary is run.
+// Compiler errors come back exactly as the compiler wrote them.
+
+#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+// Classic two-sum: one pass, hash map of complements. O(n) time, O(n) space.
+std::vector<int> two_sum(const std::vector<int>& nums, int target) {
+    std::unordered_map<int, int> seen;
+    for (int i = 0; i < static_cast<int>(nums.size()); ++i) {
+        auto it = seen.find(target - nums[i]);
+        if (it != seen.end()) {
+            return {it->second, i};
+        }
+        seen[nums[i]] = i;
+    }
+    return {};
+}
+
+int main() {
+    std::vector<int> nums{2, 7, 11, 15, 3, 6};
+    for (int target : {9, 26, 9999}) {
+        auto result = two_sum(nums, target);
+        std::cout << "target " << target << " -> ";
+        if (result.empty()) {
+            std::cout << "no pair\\n";
+        } else {
+            std::cout << "indices [" << result[0] << ", " << result[1] << "]  ("
+                      << nums[result[0]] << " + " << nums[result[1]] << ")\\n";
+        }
+    }
+    return 0;
+}
+`;
+
+const schedulerC = `/*
+ * Round-robin scheduler, reduced to the part that matters.
+ *
+ * This is the same shape as the scheduler in ARGON OS, minus the context switch:
+ * there, picking the next task is followed by swapping the stack pointer and
+ * restoring registers in assembly. Here it just prints who runs next.
+ */
+#include <stdio.h>
+
+#define MAX_TASKS 4
+#define QUANTUM   2
+
+typedef enum { READY, RUNNING, FINISHED } state_t;
+
+typedef struct {
+    const char *name;
+    int         burst;      /* ticks of work remaining */
+    state_t     state;
+} task_t;
+
+static task_t tasks[MAX_TASKS] = {
+    {"init",    3, READY},
+    {"shell",   5, READY},
+    {"logger",  2, READY},
+    {"idle",    4, READY},
 };
 
-export const getFileContent = (filename: string): string => {
-  return fileContents[filename] || `// File: ${filename}\n// Content not available`;
+static int current = -1;
+
+/* Next READY task after the current one, wrapping around. */
+static int next_ready(void) {
+    for (int i = 1; i <= MAX_TASKS; ++i) {
+        int candidate = (current + i) % MAX_TASKS;
+        if (tasks[candidate].state == READY) return candidate;
+    }
+    return -1;
+}
+
+int main(void) {
+    int tick = 0;
+
+    for (;;) {
+        int next = next_ready();
+        if (next < 0) break;
+
+        current = next;
+        task_t *t = &tasks[current];
+        t->state = RUNNING;
+
+        int slice = t->burst < QUANTUM ? t->burst : QUANTUM;
+        printf("t=%-3d %-8s runs %d tick(s)", tick, t->name, slice);
+
+        tick    += slice;
+        t->burst -= slice;
+
+        if (t->burst == 0) {
+            t->state = FINISHED;
+            printf("  [done]\\n");
+        } else {
+            t->state = READY;
+            printf("  [preempted, %d left]\\n", t->burst);
+        }
+    }
+
+    printf("\\nAll tasks finished at t=%d.\\n", tick);
+    return 0;
+}
+`;
+
+const demoHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Rendered from the editor</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: radial-gradient(circle at 30% 20%, #12263a, #05070a 60%);
+      color: #e6edf3;
+    }
+    .card {
+      padding: 2.5rem 3rem;
+      border: 1px solid #23303d;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(8px);
+      text-align: center;
+      max-width: 30rem;
+    }
+    h1 { margin: 0 0 .5rem; font-size: 1.6rem; letter-spacing: -0.02em; }
+    p  { margin: 0 0 1.25rem; color: #93a4b5; line-height: 1.6; }
+    button {
+      font: inherit; cursor: pointer;
+      padding: .6rem 1.2rem; border-radius: 8px;
+      border: 1px solid #2f81f7; background: #1f6feb; color: white;
+    }
+    button:hover { background: #388bfd; }
+    #count { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>This page is live</h1>
+    <p>
+      Editing the HTML and running it again re-renders this pane.
+      The script below is executing right now.
+    </p>
+    <button id="go">Clicked <span id="count">0</span> times</button>
+  </div>
+  <script>
+    let n = 0;
+    const label = document.getElementById('count');
+    document.getElementById('go').addEventListener('click', () => {
+      label.textContent = String(++n);
+    });
+  </script>
+</body>
+</html>
+`;
+
+/* ------------------------------------------------------------------ *
+ * The filesystem
+ * ------------------------------------------------------------------ */
+
+export const fileContents: Record<string, string> = {
+  'README.md': readme,
+  'about.md': about,
+  'stack.md': stack,
+  'products.json': productsJson,
+  'projects.json': projectsJson,
+  'contact.ts': contactTs,
+
+  'hello.js': helloJs,
+  'rate-limiter.ts': rateLimiterTs,
+  'fizzbuzz.py': fizzbuzzPy,
+  'analysis.py': analysisPy,
+  'two-sum.cpp': twoSumCpp,
+  'scheduler.c': schedulerC,
+  'demo.html': demoHtml,
+};
+
+/** Files under playground/, in tree order. These are the runnable ones. */
+export const playgroundFiles = [
+  'hello.js',
+  'rate-limiter.ts',
+  'fizzbuzz.py',
+  'analysis.py',
+  'two-sum.cpp',
+  'scheduler.c',
+  'demo.html',
+];
+
+export const getFileContent = (filename: string): string =>
+  fileContents[filename] ?? `// ${filename}\n// This file has no contents yet.\n`;
+
+export const fileExists = (filename: string): boolean =>
+  Object.prototype.hasOwnProperty.call(fileContents, filename);
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  md: 'Markdown',
+  json: 'JSON',
+  ts: 'TypeScript',
+  tsx: 'TypeScript React',
+  js: 'JavaScript',
+  jsx: 'JavaScript React',
+  css: 'CSS',
+  html: 'HTML',
+  py: 'Python',
+  c: 'C',
+  h: 'C Header',
+  cpp: 'C++',
+  java: 'Java',
+  go: 'Go',
+  rs: 'Rust',
+  sql: 'SQL',
+  sh: 'Shell',
+  yaml: 'YAML',
+  yml: 'YAML',
+  gitignore: 'Git Ignore',
+  txt: 'Plain Text',
 };
 
 export const getFileLanguage = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  const languageMap: Record<string, string> = {
-    'md': 'Markdown',
-    'json': 'JSON',
-    'ts': 'TypeScript',
-    'tsx': 'TypeScript React',
-    'js': 'JavaScript',
-    'jsx': 'JavaScript React',
-    'css': 'CSS',
-    'gitignore': 'Git Ignore',
-  };
-  return languageMap[ext || ''] || 'Plain Text';
-};
-
-export const getFileIcon = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  const iconMap: Record<string, string> = {
-    'md': 'icon-markdown',
-    'json': 'icon-json',
-    'ts': 'icon-typescript',
-    'tsx': 'icon-react',
-    'js': 'icon-javascript',
-    'css': 'icon-css',
-  };
-  return iconMap[ext || ''] || 'icon-config';
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return LANGUAGE_LABELS[ext] ?? 'Plain Text';
 };

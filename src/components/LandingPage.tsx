@@ -1,7 +1,9 @@
 "use client"
+import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
+import { useIsMobile, useMounted } from "@/lib/hooks"
 import {
   Code2,
   Monitor,
@@ -22,27 +24,17 @@ interface LandingPageProps {
 
 export default function LandingPage({ onSelectIDE }: LandingPageProps) {
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const mounted = useMounted()
+  const isMobile = useIsMobile()
   const [hoveredOption, setHoveredOption] = useState<"ide" | "simple" | null>(null)
 
   useEffect(() => {
-    setMounted(true)
-    const checkMobile = () => {
-      const mobile =
-        window.innerWidth < 768 ||
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      setIsMobile(mobile)
-      if (mobile) {
-        setTimeout(() => {
-          router.push("/portfolio")
-        }, 2000)
-      }
-    }
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [router])
+    // Only a real small screen redirects, and only once. This used to live inside the
+    // resize handler, so every resize event queued another router.push.
+    if (!isMobile) return
+    const redirect = window.setTimeout(() => router.push("/portfolio"), 1800)
+    return () => window.clearTimeout(redirect)
+  }, [isMobile, router])
 
   const handleChoice = (choice: "ide" | "simple") => {
     localStorage.setItem("ide-experience", choice)
@@ -120,7 +112,7 @@ export default function LandingPage({ onSelectIDE }: LandingPageProps) {
           </h1>
 
           <p className="text-lg md:text-xl text-gray-400 font-light leading-relaxed">
-            Full-Stack Developer & Systems Engineer
+            Product Engineer — bootloaders to multi-tenant SaaS
           </p>
         </motion.div>
 
@@ -160,7 +152,7 @@ export default function LandingPage({ onSelectIDE }: LandingPageProps) {
                       VS Code Experience
                     </h3>
                     <p className="text-gray-400 leading-relaxed text-sm">
-                      Immersive development environment simulation. Explore my code and terminal just like a real IDE.
+                      A working IDE. Browse the code, then actually run it \u2014 JavaScript, TypeScript, Python, C and C++.
                     </p>
                   </div>
 
@@ -239,7 +231,11 @@ function Tag({
   icon: Icon,
   label,
   color,
-}: { icon: any; label: string; color: "blue" | "cyan" | "yellow" | "purple" | "pink" | "indigo" }) {
+}: {
+  icon: React.ComponentType<{ size?: number }>
+  label: string
+  color: "blue" | "cyan" | "yellow" | "purple" | "pink" | "indigo"
+}) {
   const colors = {
     blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
     cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",

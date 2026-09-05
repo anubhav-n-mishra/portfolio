@@ -3,130 +3,93 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Github, Linkedin, Mail, ExternalLink, Code, Database, Globe,
-  ChevronDown, ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
+  Github, Linkedin, Mail, ExternalLink, Code, Database,
+  ChevronDown, Menu, X, Sun, Moon,
   User, GraduationCap, Code2, Heart, MapPin, Download, Phone,
   Award, Zap, Send, Sparkles, Monitor
 } from 'lucide-react';
+import { portfolioData } from '@/data/portfolio';
 import './portfolio.css';
 
-// Skills data from resume
-const skillCategories = {
-  languages: {
-    title: 'Programming Languages',
-    skills: [
-      { name: 'Python', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg' },
-      { name: 'C', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/c/c-original.svg' },
-      { name: 'C++', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cplusplus/cplusplus-original.svg' },
-      { name: 'Java', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg' },
-      { name: 'JavaScript', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg' },
-      { name: 'SQL', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg' },
-      { name: 'x86 Assembly', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg' },
-    ]
-  },
-  frontend: {
-    title: 'Frontend Development',
-    skills: [
-      { name: 'React.js', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg' },
-      { name: 'Next.js', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg' },
-      { name: 'HTML5', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg' },
-      { name: 'CSS3', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg' },
-      { name: 'Tailwind CSS', logo: 'https://www.vectorlogo.zone/logos/tailwindcss/tailwindcss-icon.svg' },
-    ]
-  },
-  backend: {
-    title: 'Backend & Databases',
-    skills: [
-      { name: 'Node.js', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg' },
-      { name: 'Express.js', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg' },
-      { name: 'MongoDB', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg' },
-      { name: 'MySQL', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg' },
-      { name: 'PostgreSQL', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg' },
-      { name: 'Supabase', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/supabase/supabase-original.svg' },
-    ]
-  },
-  tools: {
-    title: 'Tools & DevOps',
-    skills: [
-      { name: 'Git', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg' },
-      { name: 'GitHub', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg' },
-      { name: 'Docker', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg' },
-      { name: 'Linux', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg' },
-      { name: 'QEMU', logo: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg' },
-      { name: 'Vercel', logo: 'https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_light_background.png' },
-    ]
-  },
+const { personal, products, projects, skills, certifications, achievements } = portfolioData;
+
+// Skill groups shown on this page. Names come from the shared data; the accent
+// colours live here.
+//
+// These used to be <img> tags pointing at a third-party icon CDN. That made the whole
+// section depend on a network the visitor might not reach, and any mismatched path
+// rendered as a broken-image icon. Colour plus the name is self-contained and faster.
+const ACCENTS: Record<string, string> = {
+  TypeScript: '#3178c6',
+  JavaScript: '#f7df1e',
+  Python: '#3572a5',
+  C: '#a8b9cc',
+  'C++': '#f34b7d',
+  'Next.js': '#ffffff',
+  React: '#61dafb',
+  'Node.js': '#5fa04e',
+  FastAPI: '#059486',
+  PostgreSQL: '#4169e1',
+  'SQL + Row-Level Security': '#4169e1',
+  Supabase: '#3ecf8e',
+  Prisma: '#5a67d8',
+  Docker: '#2496ed',
+  Git: '#f05032',
+  'Tailwind CSS': '#38bdf8',
+  Electron: '#9feaf9',
+  LLVM: '#4f4f4f',
+  NASM: '#c9a227',
+  WebAssembly: '#654ff0',
+  OpenCV: '#5c3ee8',
+  Vitest: '#fcc72b',
+  pnpm: '#f9ad00',
+  Kubernetes: '#326ce5',
+  'MinIO / S3': '#c72e49',
+  Polars: '#cd792c',
+  DuckDB: '#fff000',
+  WebAuthn: '#3423a6',
+  'Web Push': '#ff6f00',
+  WebRTC: '#ac2b1c',
+  PeerJS: '#ffd54f',
+  'Distributed systems': '#8b95a5',
+  'Observability & tracing': '#8b95a5',
+  'Payments at scale': '#8b95a5',
 };
 
-// Projects from resume
+const withAccents = (names: string[]) =>
+  names.map((name) => ({ name, accent: ACCENTS[name] ?? '#7c8595' }));
+
+const skillCategories = {
+  confident: { title: skills.confident.label, skills: withAccents(skills.confident.items) },
+  shipped: { title: skills.shipped.label, skills: withAccents(skills.shipped.items) },
+  learning: { title: skills.learning.label, skills: withAccents(skills.learning.items) },
+};
+
+// Products and projects, both from the single shared data source so the IDE,
+// the terminal and this page can never disagree with each other.
 const projectData = [
-  {
-    id: 1,
-    title: "ARGON OS",
-    description: "A modular x86 operating system from scratch in C and Assembly, including a custom bootloader, protected-mode kernel, in-memory file system, command-line shell with 10+ commands, round-robin process scheduling, and memory-safe I/O. Achieved 100% build success in 20+ CI-tested development cycles.",
-    technologies: ["C", "x86 Assembly", "QEMU", "Make", "GCC"],
-    githubUrl: "https://github.com/anubhav-n-mishra",
-    featured: true
-  },
-  {
-    id: 2,
-    title: "GRAN Compiler",
-    description: "LLVM-based compiler for a custom programming language. Statically typed, C-like language with variables, functions, control flow, and print statements using a recursive descent parser. Integrated LLVM IR generation and C-based runtime system, compiling 30+ programs across Linux/macOS.",
-    technologies: ["C++", "LLVM", "Make", "C"],
-    githubUrl: "https://github.com/anubhav-n-mishra",
-    featured: true
-  },
-  {
-    id: 3,
-    title: "CineWave",
-    description: "Full-stack movie trailer & group watch platform. Features user authentication, React.js frontend with Node.js backend, protected routes, watchlist, reviews, and premium content via Supabase and Razorpay. Real-time group watch with chat using Socket.io for 3+ concurrent users.",
-    technologies: ["React", "Node.js", "Supabase", "Razorpay", "Socket.io", "Tailwind CSS"],
-    liveUrl: "#",
-    githubUrl: "https://github.com/anubhav-n-mishra",
-    featured: true
-  },
-  {
-    id: 4,
-    title: "IDE Portfolio",
-    description: "A VS Code-style portfolio website with interactive terminal, file editor, and in-IDE browser. Features dark/light theme toggle, command palette, and responsive design.",
-    technologies: ["Next.js", "TypeScript", "Tailwind CSS", "Zustand"],
-    liveUrl: "/",
-    githubUrl: "https://github.com/anubhav-n-mishra",
-    featured: true
-  },
-  {
-    id: 5,
-    title: "Steganography Tool",
-    description: "Python-based LSB steganography implementation for hiding secret messages within images securely.",
-    technologies: ["Python", "NumPy", "PIL"],
-    githubUrl: "https://github.com/anubhav-n-mishra",
-    featured: false
-  },
-  {
-    id: 6,
-    title: "OWASP Risk Calculator",
-    description: "Risk assessment tool based on OWASP methodology with intuitive Tkinter GUI for security analysis.",
-    technologies: ["Python", "Tkinter"],
-    githubUrl: "https://github.com/anubhav-n-mishra",
-    featured: false
-  },
-];
-
-// Certifications from resume
-const certifications = [
-  "Google Cybersecurity Professional Certificate – Google",
-  "AWS Cloud Quest - AWS",
-  "Google Cloud Computing Foundations – NPTEL",
-  "Cybersecurity Fundamentals – Cisco",
-  "Networking Fundamentals – Cisco",
-];
-
-// Achievements from resume
-const achievements = [
-  { title: "6th Rank – AWS JAM", year: "2025", description: "Dehradun's First AWS Jam Event" },
-  { title: "Finalist – Hack-O-Holic Hackathon", year: "2023", description: "Graphic Era Hill University" },
-  { title: "Selected for Amazon ML Summer School", year: "2025", description: "Competitive ML program" },
-  { title: "President – College E&D Club", year: "2024-2025", description: "Led 100+ students in workshops on cybersecurity, startup incubation" },
+  ...products.map((p, i) => ({
+    id: `product-${i}`,
+    title: p.name,
+    description: p.description,
+    technologies: p.tech,
+    liveUrl: p.url,
+    githubUrl: undefined as string | undefined,
+    kind: 'product' as const,
+    note: p.note,
+    featured: true,
+  })),
+  ...projects.map((p, i) => ({
+    id: `project-${i}`,
+    title: p.name,
+    description: p.description,
+    technologies: p.tech,
+    liveUrl: undefined as string | undefined,
+    githubUrl: p.repo,
+    kind: 'project' as const,
+    note: undefined as string | undefined,
+    featured: p.featured,
+  })),
 ];
 
 export default function PortfolioPage() {
@@ -134,8 +97,7 @@ export default function PortfolioPage() {
   const [darkMode, setDarkMode] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('languages');
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [activeCategory, setActiveCategory] = useState('confident');
   const heroCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const switchToIDEView = () => {
@@ -302,11 +264,6 @@ export default function PortfolioPage() {
   }, []);
 
   // Project slideshow
-  const projectsPerSlide = 3;
-  const totalSlides = projectData.length - projectsPerSlide + 1;
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % totalSlides);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
-  const getCurrentSlideProjects = () => projectData.slice(currentSlide, currentSlide + projectsPerSlide);
 
   const scrollToSection = (id: string) => {
     setIsMenuOpen(false);
@@ -382,6 +339,7 @@ export default function PortfolioPage() {
             {/* Profile Image */}
             <div className="hero-profile">
               <div className="profile-image-container">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/profile.png" alt="Anubhav Mishra" className="profile-image" />
                 <div className="profile-ring"></div>
                 <div className="profile-glow"></div>
@@ -392,12 +350,10 @@ export default function PortfolioPage() {
               Hi, I&apos;m <span className="gradient-text">Anubhav Mishra</span>
             </h1>
             <h2 className="hero-subtitle">
-              <span className="typing-text">Full-Stack Developer &amp; Systems Engineer</span>
+              <span className="typing-text">{personal.title} — {personal.subtitle}</span>
             </h2>
             <p className="hero-description">
-              Final-Year B.Tech CSE Student at Graphic Era Hill University.
-              Passionate about building operating systems, compilers, and scalable web applications.
-              Currently exploring distributed systems, backend architectures, and full-stack engineering.
+              {personal.tagline}
             </p>
 
             <div className="hero-cta">
@@ -454,42 +410,36 @@ export default function PortfolioPage() {
               <div className="about-card main-card">
                 <div className="card-icon"><User size={24} /></div>
                 <h3>Who I Am</h3>
-                <p>
-                  I&apos;m a final-year Computer Science student driven by curiosity and a love for
-                  turning ideas into digital solutions. From building operating systems to crafting
-                  full-stack web applications, I enjoy tackling complex problems and creating
-                  impactful software. My focus is on systems programming, compiler design, and
-                  modern web development.
-                </p>
+                <p style={{ whiteSpace: 'pre-line' }}>{personal.bio}</p>
               </div>
 
               <div className="about-grid">
                 <div className="about-card">
                   <div className="card-icon"><GraduationCap size={20} /></div>
                   <h4>Education</h4>
-                  <p>B.Tech CSE - 7.63/10 CGPA</p>
-                  <span className="card-detail">Graphic Era Hill University, Dehradun (2022 - Present)</span>
+                  <p>B.Tech CSE — 7.63/10 CGPA</p>
+                  <span className="card-detail">{personal.education.university}, Dehradun — {personal.education.status}</span>
                 </div>
 
                 <div className="about-card">
                   <div className="card-icon"><Code2 size={20} /></div>
                   <h4>Focus Areas</h4>
-                  <p>Systems & Full-Stack</p>
-                  <span className="card-detail">Operating Systems, Compilers, React/Node.js</span>
+                  <p>Shipping production software</p>
+                  <span className="card-detail">Multi-tenant SaaS, Postgres + RLS, on-prem delivery</span>
                 </div>
 
                 <div className="about-card">
                   <div className="card-icon"><Heart size={20} /></div>
                   <h4>Driven By</h4>
-                  <p>Innovation & Learning</p>
-                  <span className="card-detail">Building robust software, solving real-world problems</span>
+                  <p>Correctness at the right layer</p>
+                  <span className="card-detail">Rules enforced in the database, not hidden in the UI</span>
                 </div>
 
                 <div className="about-card">
                   <div className="card-icon"><MapPin size={20} /></div>
                   <h4>Location</h4>
-                  <p>Dehradun, India</p>
-                  <span className="card-detail">Open to remote & relocation</span>
+                  <p>{personal.location}</p>
+                  <span className="card-detail">{personal.timezone} — {personal.overlap}</span>
                 </div>
               </div>
             </div>
@@ -509,11 +459,10 @@ export default function PortfolioPage() {
 
           <div className="skills-categories">
             {[
-              { id: 'languages', label: 'Languages', icon: <Code size={18} /> },
-              { id: 'frontend', label: 'Frontend', icon: <Globe size={18} /> },
-              { id: 'backend', label: 'Backend', icon: <Database size={18} /> },
-              { id: 'tools', label: 'Tools', icon: <Zap size={18} /> },
-              { id: 'all', label: 'All Skills', icon: <Sparkles size={18} /> },
+              { id: 'confident', label: 'Would defend in an interview', icon: <Code size={18} /> },
+              { id: 'shipped', label: 'Shipped real things with', icon: <Database size={18} /> },
+              { id: 'learning', label: 'Currently learning', icon: <Zap size={18} /> },
+              { id: 'all', label: 'Everything', icon: <Sparkles size={18} /> },
             ].map(cat => (
               <button
                 key={cat.id}
@@ -528,10 +477,12 @@ export default function PortfolioPage() {
 
           <div className="skills-grid">
             {filteredSkills.map((skill) => (
-              <div key={skill.name} className="skill-card">
-                <div className="skill-icon">
-                  <img src={skill.logo} alt={skill.name} width={32} height={32} />
-                </div>
+              <div
+                key={skill.name}
+                className="skill-card"
+                style={{ ['--skill-accent' as string]: skill.accent }}
+              >
+                <span className="skill-mark" aria-hidden />
                 <h4 className="skill-name">{skill.name}</h4>
               </div>
             ))}
@@ -560,58 +511,79 @@ export default function PortfolioPage() {
         </div>
 
         <div className="container">
-          <h2 className="section-title">My Projects</h2>
-          <p className="section-subtitle">A showcase of my recent work and personal projects</p>
+          <h2 className="section-title">Selected Work</h2>
+          <p className="section-subtitle">
+            Products running in production, and the engineering behind them
+          </p>
 
-          <div className="projects-slideshow">
-            {totalSlides > 1 && (
-              <>
-                <button className="slide-nav slide-nav-prev" onClick={prevSlide}>
-                  <ChevronLeft size={24} />
-                </button>
-                <button className="slide-nav slide-nav-next" onClick={nextSlide}>
-                  <ChevronRight size={24} />
-                </button>
-              </>
-            )}
+          {/* Live products first — a recruiter should hit these before anything else.
+              This used to be one 3-at-a-time carousel over every item, which meant
+              fourteen clicks to see the whole list. */}
+          <h3 className="work-group-title">Live in production</h3>
+          <div className="projects-grid">
+            {projectData
+              .filter((p) => p.kind === 'product')
+              .map((project) => (
+                <div key={project.id} className="project-card featured">
+                  <div className="project-content">
+                    <h3 className="project-title">
+                      {project.title}
+                      {project.note && <span className="project-note"> · {project.note}</span>}
+                    </h3>
+                    <p className="project-description">{project.description}</p>
+                    <div className="project-technologies">
+                      {project.technologies.slice(0, 6).map((tech) => (
+                        <span key={tech} className="tech-tag">{tech}</span>
+                      ))}
+                    </div>
+                    <div className="project-links">
+                      {project.liveUrl ? (
+                        <a
+                          href={project.liveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="project-link"
+                        >
+                          <ExternalLink size={18} /> Visit
+                        </a>
+                      ) : (
+                        <span className="project-link project-link-muted">In active development</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
 
-            <div className="projects-grid">
-              {getCurrentSlideProjects().map((project) => (
+          <h3 className="work-group-title">Selected engineering</h3>
+          <div className="projects-grid">
+            {projectData
+              .filter((p) => p.kind === 'project')
+              .map((project) => (
                 <div key={project.id} className={`project-card ${project.featured ? 'featured' : ''}`}>
                   <div className="project-content">
                     <h3 className="project-title">{project.title}</h3>
                     <p className="project-description">{project.description}</p>
                     <div className="project-technologies">
-                      {project.technologies.map((tech) => (
+                      {project.technologies.slice(0, 6).map((tech) => (
                         <span key={tech} className="tech-tag">{tech}</span>
                       ))}
                     </div>
                     <div className="project-links">
-                      {project.liveUrl && (
-                        <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="project-link">
-                          <ExternalLink size={18} /> Live Demo
+                      {project.githubUrl && (
+                        <a
+                          href={project.githubUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="project-link"
+                        >
+                          <Github size={18} /> Source
                         </a>
                       )}
-                      <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" className="project-link">
-                        <Github size={18} /> Source Code
-                      </a>
                     </div>
                   </div>
                 </div>
               ))}
-            </div>
-
-            {totalSlides > 1 && (
-              <div className="slide-indicators">
-                {Array.from({ length: totalSlides }, (_, i) => (
-                  <button
-                    key={i}
-                    className={`slide-indicator ${currentSlide === i ? 'active' : ''}`}
-                    onClick={() => setCurrentSlide(i)}
-                  />
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Achievements */}

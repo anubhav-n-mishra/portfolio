@@ -1,108 +1,95 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useEditorStore } from '@/store/editor';
+import { useThemeStore } from '@/store/theme';
+import { useRunnerStore } from '@/store/runner';
 import { getFileLanguage } from '@/data/files';
-import { useRouter } from 'next/navigation';
-import {
-  GitBranch,
-  RefreshCw,
-  XCircle,
-  AlertTriangle,
-  Bell,
-  Check,
-  Radio,
-  Braces,
-  ArrowLeftRight,
-} from 'lucide-react';
+import { languageFor } from '@/lib/runtime';
+import { GitBranch, Bell, Check, CircleDot, Play, Loader2, Radio } from 'lucide-react';
 
 export default function StatusBar() {
-  const { activeFile } = useEditorStore();
-  const router = useRouter();
-  const language = activeFile ? getFileLanguage(activeFile) : 'Plain Text';
+  const { activeFile, tabs, toggleTerminal, openCommandPalette, contentOf, previewDocument } = useEditorStore();
+  const { theme } = useThemeStore();
+  const { running, runningFile, lastResult, run } = useRunnerStore();
 
-  const switchToSimpleView = () => {
-    localStorage.removeItem('ide-experience');
-    router.push('/portfolio');
-  };
+  const [cursor, setCursor] = useState({ line: 1, col: 1 });
+
+  // The editor reports the caret through a window event, so typing does not
+  // re-render the whole layout on every keystroke.
+  useEffect(() => {
+    const onCursor = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { line: number; col: number };
+      setCursor({ line: detail.line, col: detail.col });
+    };
+    window.addEventListener('editor:cursor', onCursor);
+    return () => window.removeEventListener('editor:cursor', onCursor);
+  }, []);
+
+  const language = activeFile ? getFileLanguage(activeFile) : 'Plain Text';
+  const spec = activeFile ? languageFor(activeFile) : null;
+  const dirtyCount = tabs.filter((t) => t.isDirty).length;
+
+  const item =
+    'flex items-center gap-1.5 px-2 h-full hover:bg-white/15 transition-colors cursor-pointer whitespace-nowrap';
 
   return (
-    <footer className="flex items-center justify-between h-[22px] bg-[var(--bg-statusbar)] text-[11px] sm:text-[12px] text-white select-none flex-shrink-0 overflow-hidden">
-      {/* Left Side */}
-      <div className="flex items-center h-full shrink-0">
-        {/* Remote Indicator */}
-        <div className="flex items-center gap-1 px-1.5 sm:px-2 h-full bg-[#16825d] hover:bg-[#1a9e6e] cursor-pointer transition-colors">
-          <Radio size={14} />
-        </div>
-
-        {/* Git Branch */}
-        <div className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 h-full hover:bg-white/10 cursor-pointer transition-colors">
-          <GitBranch size={14} />
+    <footer
+      className="h-[22px] flex items-center justify-between text-[12px] shrink-0 select-none"
+      style={{ background: 'var(--bg-statusbar)', color: '#ffffff' }}
+    >
+      <div className="flex items-center h-full min-w-0">
+        <button className={item} onClick={() => useEditorStore.getState().showSidebarPanel('git')}>
+          <GitBranch size={13} />
           <span className="hidden sm:inline">main</span>
-          <RefreshCw size={12} className="hidden sm:block opacity-70" />
-        </div>
+          {dirtyCount > 0 && <span className="opacity-90">{dirtyCount}*</span>}
+        </button>
 
-        {/* Problems - Hidden on very small screens */}
-        <div className="hidden sm:flex items-center gap-2 px-2 h-full hover:bg-white/10 cursor-pointer transition-colors">
-          <div className="flex items-center gap-1">
-            <XCircle size={14} />
-            <span>0</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <AlertTriangle size={14} />
-            <span>0</span>
-          </div>
-        </div>
+        <button className={item} onClick={toggleTerminal} title="Toggle terminal (Ctrl+`)">
+          {running ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+          <span className="hidden md:inline">
+            {running ? `Running ${runningFile}` : lastResult ? `Exit ${lastResult.exitCode}` : 'Ready'}
+          </span>
+        </button>
+
+        {spec && !running && (
+          <button
+            className={item}
+            title={`Run ${activeFile} — ${spec.runHint}`}
+            onClick={() => {
+              if (!activeFile) return;
+              useEditorStore.setState({ terminalOpen: true });
+              run(activeFile, contentOf(activeFile), (doc, title) => previewDocument(doc, title));
+            }}
+          >
+            <Play size={12} fill="currentColor" />
+            <span className="hidden lg:inline">Run</span>
+          </button>
+        )}
+
+        {spec?.remote && (
+          <span className={`${item} cursor-default opacity-80 hidden lg:flex`} title="This language compiles in a remote sandbox">
+            <Radio size={12} />
+            remote toolchain
+          </span>
+        )}
       </div>
 
-      {/* Right Side */}
-      <div className="flex items-center h-full overflow-hidden">
-        {/* Line & Column */}
-        <div className="hidden md:flex px-2 h-full items-center hover:bg-white/10 cursor-pointer transition-colors whitespace-nowrap">
-          Ln 1, Col 1
-        </div>
-
-        {/* Spaces - Hidden on mobile */}
-        <div className="hidden lg:flex px-2 h-full items-center hover:bg-white/10 cursor-pointer transition-colors">
-          Spaces: 2
-        </div>
-
-        {/* Encoding - Hidden on mobile */}
-        <div className="hidden lg:flex px-2 h-full items-center hover:bg-white/10 cursor-pointer transition-colors">
-          UTF-8
-        </div>
-
-        {/* Line Ending - Hidden on mobile */}
-        <div className="hidden xl:flex px-2 h-full items-center hover:bg-white/10 cursor-pointer transition-colors">
-          CRLF
-        </div>
-
-        {/* Language */}
-        <div className="px-1.5 sm:px-2 h-full flex items-center gap-1 sm:gap-1.5 hover:bg-white/10 cursor-pointer transition-colors">
-          <Braces size={14} />
-          <span className="truncate max-w-[60px] sm:max-w-none">{language}</span>
-        </div>
-
-        {/* Copilot indicator - Hidden on mobile */}
-        <div className="hidden sm:flex px-2 h-full items-center gap-1.5 hover:bg-white/10 cursor-pointer transition-colors">
-          <Check size={14} />
-          <span className="hidden md:inline">Copilot</span>
-        </div>
-
-        {/* Notifications */}
-        <div className="px-1.5 sm:px-2 h-full flex items-center hover:bg-white/10 cursor-pointer transition-colors">
-          <Bell size={14} />
-        </div>
-
-        {/* Switch View Button - at the end */}
-        <button
-          onClick={switchToSimpleView}
-          className="flex items-center gap-1 px-2 h-full bg-[#6366f1] hover:bg-[#818cf8] cursor-pointer transition-colors text-white whitespace-nowrap"
-          title="Switch to Simple Portfolio View"
-        >
-          <ArrowLeftRight size={12} />
-          <span className="hidden md:inline text-[11px]">Switch View</span>
+      <div className="flex items-center h-full">
+        <button className={`${item} hidden sm:flex`} onClick={() => openCommandPalette('commands')}>
+          Ln {cursor.line}, Col {cursor.col}
         </button>
+        <span className={`${item} cursor-default hidden md:flex`}>Spaces: 2</span>
+        <span className={`${item} cursor-default hidden lg:flex`}>UTF-8</span>
+        <button className={item} onClick={() => openCommandPalette('commands')}>
+          {language}
+        </button>
+        <span className={`${item} cursor-default hidden sm:flex`} title={`${theme} theme`}>
+          <CircleDot size={12} />
+        </span>
+        <span className={`${item} cursor-default`}>
+          <Bell size={13} />
+        </span>
       </div>
     </footer>
   );
