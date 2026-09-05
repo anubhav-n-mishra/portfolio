@@ -1,86 +1,83 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useThemeStore } from '@/store/theme';
 import { useEditorStore } from '@/store/editor';
+import { useRunnerStore } from '@/store/runner';
+import { portfolioData } from '@/data/portfolio';
+import { playgroundFiles } from '@/data/files';
+import { pickFiles } from '@/lib/pickFiles';
 import {
-  Sun,
-  Moon,
-  Minus,
-  Square,
-  X,
-  Code2,
-  LayoutGrid,
-  ArrowLeft,
-  ArrowRight,
-  Search,
-  SquareSplitHorizontal,
-  PanelLeft,
-  PanelRight,
-  Menu,
+  Sun, Moon, Code2, Search, PanelLeft, PanelBottom, Menu, X, Play,
 } from 'lucide-react';
 
-interface MenuItemProps {
-  label: string;
-  items: { label?: string; shortcut?: string; action?: () => void; divider?: boolean }[];
+interface MenuEntry {
+  label?: string;
+  shortcut?: string;
+  action?: () => void;
+  divider?: boolean;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ label, items }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
+interface MenuDef {
+  label: string;
+  items: MenuEntry[];
+}
+
+const MenuButton: React.FC<{
+  menu: MenuDef;
+  openMenu: string | null;
+  setOpenMenu: (label: string | null) => void;
+}> = ({ menu, openMenu, setOpenMenu }) => {
+  const isOpen = openMenu === menu.label;
 
   return (
     <div
-      className="relative"
-      style={{ height: '100%', display: 'flex', alignItems: 'center' }}
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
+      className="relative h-full flex items-center"
+      // Hovering moves between menus only once one is already open, like a real menu bar.
+      onMouseEnter={() => openMenu && setOpenMenu(menu.label)}
     >
       <button
+        onClick={() => setOpenMenu(isOpen ? null : menu.label)}
+        className="h-full px-2 text-[13px] hover:bg-white/10"
         style={{
-          height: '100%',
-          padding: '0 8px',
-          fontSize: '13px',
           color: 'var(--text-primary)',
           background: isOpen ? 'rgba(255,255,255,0.1)' : 'transparent',
-          border: 'none',
-          cursor: 'pointer',
         }}
-        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-        onMouseOut={(e) => e.currentTarget.style.background = isOpen ? 'rgba(255,255,255,0.1)' : 'transparent'}
-        onClick={() => setIsOpen(!isOpen)}
       >
-        {label}
+        {menu.label}
       </button>
+
       {isOpen && (
-        <div
-          className="absolute top-full left-0 min-w-[220px] py-1 rounded shadow-xl z-[200]"
-          style={{
-            backgroundColor: 'var(--bg-dropdown)',
-            border: '1px solid var(--border-color)'
-          }}
-        >
-          {items.map((item, idx) => (
-            item.divider ? (
-              <div key={idx} className="h-px my-1 mx-2" style={{ backgroundColor: 'var(--border-color)' }} />
-            ) : (
-              <button
-                key={idx}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  item.action?.();
-                  setIsOpen(false);
-                }}
-                className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] hover:bg-white/10 text-left"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                <span>{item.label}</span>
-                {item.shortcut && (
-                  <span className="text-[11px] ml-6" style={{ color: 'var(--text-muted)' }}>{item.shortcut}</span>
-                )}
-              </button>
-            )
-          ))}
-        </div>
+        <>
+          <div className="fixed inset-0 z-[150]" onClick={() => setOpenMenu(null)} />
+          <div
+            className="absolute top-full left-0 min-w-[240px] py-1 rounded-b shadow-2xl z-[200]"
+            style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-color)' }}
+          >
+            {menu.items.map((item, i) =>
+              item.divider ? (
+                <div key={i} className="h-px my-1 mx-2" style={{ background: 'var(--border-color)' }} />
+              ) : (
+                <button
+                  key={i}
+                  onClick={() => {
+                    item.action?.();
+                    setOpenMenu(null);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] text-left hover:bg-white/10"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  <span>{item.label}</span>
+                  {item.shortcut && (
+                    <span className="text-[11px] ml-8" style={{ color: 'var(--text-muted)' }}>
+                      {item.shortcut}
+                    </span>
+                  )}
+                </button>
+              )
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -88,355 +85,224 @@ const MenuItem: React.FC<MenuItemProps> = ({ label, items }) => {
 
 export default function TitleBar() {
   const { theme, toggleTheme } = useThemeStore();
-  const { toggleSidebar, toggleTerminal, openCommandPalette, createFile, openFile, openSimpleBrowser } = useEditorStore();
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
+  const {
+    toggleSidebar, toggleTerminal, openCommandPalette, createFile, openFile,
+    openSimpleBrowser, showSidebarPanel, activeFile, contentOf, previewDocument,
+    closeFile, closeAllFiles, saveFile,
+  } = useEditorStore();
+  const { run, stop, running } = useRunnerStore();
 
-  // Handle file upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result as string;
-          createFile('/src', file.name);
-          setTimeout(() => {
-            useEditorStore.getState().updateFileContent(file.name, content);
-            openFile(file.name);
-          }, 100);
-        };
-        reader.readAsText(file);
-      });
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const { contact } = portfolioData;
+
+  const openUploadDialog = useCallback(async () => {
+    const loaded = await pickFiles();
+    loaded.forEach(({ name, content }) => createFile('/playground', name, content));
+    if (loaded[0]) openFile(loaded[0].name);
+  }, [createFile, openFile]);
+
+  const runActive = () => {
+    if (running) {
+      stop();
+      return;
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!activeFile) return;
+    useEditorStore.setState({ terminalOpen: true });
+    run(activeFile, contentOf(activeFile), (doc, title) => previewDocument(doc, title));
   };
 
-  // Handle folder upload
-  const handleFolderUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result as string;
-          createFile('/src', file.name);
-          setTimeout(() => {
-            useEditorStore.getState().updateFileContent(file.name, content);
-          }, 100);
-        };
-        reader.readAsText(file);
-      });
-      if (files.length > 0) {
-        openFile(files[0].name);
-      }
-    }
-    if (folderInputRef.current) folderInputRef.current.value = '';
-  };
-
-  // Download resume
-  const downloadResume = () => {
-    const link = document.createElement('a');
-    link.href = '/Anubhav_Mishra.pdf';
-    link.download = 'Anubhav_Mishra.pdf';
-    link.click();
-  };
-
-  const menuItems: MenuItemProps[] = [
+  const menus: MenuDef[] = [
     {
       label: 'File',
       items: [
         {
-          label: 'New File', shortcut: 'Ctrl+N', action: () => {
-            const name = prompt('Enter file name:');
-            if (name) { createFile('/src', name); openFile(name); }
-          }
+          label: 'New file...',
+          shortcut: 'Ctrl+N',
+          action: () => {
+            const name = window.prompt('File name (the extension decides the language)', 'solution.py');
+            if (name?.trim()) {
+              createFile('/playground', name.trim());
+              openFile(name.trim());
+            }
+          },
         },
-        { label: 'New Window', shortcut: 'Ctrl+Shift+N', action: () => window.open(window.location.href, '_blank') },
+        { label: 'Open from your computer...', shortcut: 'Ctrl+O', action: openUploadDialog },
         { divider: true },
-        { label: 'Open File...', shortcut: 'Ctrl+O', action: () => fileInputRef.current?.click() },
-        { label: 'Open Folder...', shortcut: 'Ctrl+K', action: () => folderInputRef.current?.click() },
+        { label: 'Go to file...', shortcut: 'Ctrl+P', action: () => openCommandPalette('files') },
         { divider: true },
-        { label: 'Download Resume', shortcut: 'Ctrl+D', action: downloadResume },
-        { label: 'Export Portfolio', action: () => alert('Portfolio exported!') },
+        { label: 'Save', shortcut: 'Ctrl+S', action: () => activeFile && saveFile(activeFile) },
         { divider: true },
-        { label: 'Save', shortcut: 'Ctrl+S', action: () => alert('File saved!') },
-        { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => alert('Save As dialog') },
+        { label: 'Download resume', action: () => window.open(contact.resume, '_blank', 'noopener,noreferrer') },
         { divider: true },
-        {
-          label: 'Close Editor', shortcut: 'Ctrl+W', action: () => {
-            const { activeFile, closeFile } = useEditorStore.getState();
-            if (activeFile) closeFile(activeFile);
-          }
-        },
-      ],
-    },
-    {
-      label: 'Edit',
-      items: [
-        { label: 'Undo', shortcut: 'Ctrl+Z', action: () => document.execCommand('undo') },
-        { label: 'Redo', shortcut: 'Ctrl+Y', action: () => document.execCommand('redo') },
-        { divider: true },
-        { label: 'Cut', shortcut: 'Ctrl+X', action: () => document.execCommand('cut') },
-        { label: 'Copy', shortcut: 'Ctrl+C', action: () => document.execCommand('copy') },
-        { label: 'Paste', shortcut: 'Ctrl+V', action: () => document.execCommand('paste') },
-        { divider: true },
-        {
-          label: 'Find', shortcut: 'Ctrl+F', action: () => {
-            const search = prompt('Find:');
-            if (search) (window as unknown as { find: (str: string) => void }).find(search);
-          }
-        },
-        { label: 'Replace', shortcut: 'Ctrl+H', action: () => alert('Replace dialog') },
-        { divider: true },
-        { label: 'Command Palette', shortcut: 'Ctrl+Shift+P', action: openCommandPalette },
-      ],
-    },
-    {
-      label: 'Selection',
-      items: [
-        { label: 'Select All', shortcut: 'Ctrl+A', action: () => document.execCommand('selectAll') },
-        { label: 'Expand Selection', shortcut: 'Shift+Alt+→' },
-        { label: 'Shrink Selection', shortcut: 'Shift+Alt+←' },
-        { divider: true },
-        { label: 'Copy Line Up', shortcut: 'Shift+Alt+↑' },
-        { label: 'Copy Line Down', shortcut: 'Shift+Alt+↓' },
-        { label: 'Move Line Up', shortcut: 'Alt+↑' },
-        { label: 'Move Line Down', shortcut: 'Alt+↓' },
+        { label: 'Close editor', shortcut: 'Ctrl+W', action: () => activeFile && closeFile(activeFile) },
+        { label: 'Close all editors', action: closeAllFiles },
       ],
     },
     {
       label: 'View',
       items: [
-        { label: 'Command Palette...', shortcut: 'Ctrl+Shift+P', action: openCommandPalette },
+        { label: 'Command palette...', shortcut: 'Ctrl+Shift+P', action: () => openCommandPalette('commands') },
         { divider: true },
-        { label: 'Explorer', shortcut: 'Ctrl+Shift+E', action: () => useEditorStore.getState().setSidebarPanel('explorer') },
-        { label: 'Search', shortcut: 'Ctrl+Shift+F', action: () => useEditorStore.getState().setSidebarPanel('search') },
-        { label: 'Source Control', shortcut: 'Ctrl+Shift+G', action: () => useEditorStore.getState().setSidebarPanel('git') },
-        { label: 'Extensions', shortcut: 'Ctrl+Shift+X', action: () => useEditorStore.getState().setSidebarPanel('extensions') },
+        { label: 'Explorer', shortcut: 'Ctrl+Shift+E', action: () => showSidebarPanel('explorer') },
+        { label: 'Search', shortcut: 'Ctrl+Shift+F', action: () => showSidebarPanel('search') },
+        { label: 'Source Control', shortcut: 'Ctrl+Shift+G', action: () => showSidebarPanel('git') },
+        { label: 'Extensions', shortcut: 'Ctrl+Shift+X', action: () => showSidebarPanel('extensions') },
+        { label: 'Assistant', action: () => showSidebarPanel('ai') },
         { divider: true },
-        { label: 'Toggle Sidebar', shortcut: 'Ctrl+B', action: toggleSidebar },
-        { label: 'Toggle Terminal', shortcut: 'Ctrl+`', action: toggleTerminal },
+        { label: 'Toggle sidebar', shortcut: 'Ctrl+B', action: toggleSidebar },
+        { label: 'Toggle terminal', shortcut: 'Ctrl+`', action: toggleTerminal },
         { divider: true },
-        { label: 'Toggle Theme', shortcut: 'Ctrl+K', action: toggleTheme },
-        { label: 'Zoom In', shortcut: 'Ctrl++', action: () => { document.body.style.zoom = String(parseFloat(document.body.style.zoom || '1') + 0.1); } },
-        { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => { document.body.style.zoom = String(parseFloat(document.body.style.zoom || '1') - 0.1); } },
-        { label: 'Reset Zoom', shortcut: 'Ctrl+0', action: () => { document.body.style.zoom = '1'; } },
+        { label: `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`, action: toggleTheme },
+        { label: 'Settings', shortcut: 'Ctrl+,', action: () => showSidebarPanel('settings') },
+      ],
+    },
+    {
+      label: 'Run',
+      items: [
+        { label: running ? 'Stop' : 'Run active file', shortcut: 'Ctrl+Enter', action: runActive },
+        { divider: true },
+        ...playgroundFiles.map((f) => ({
+          label: `Run ${f}`,
+          action: () => {
+            openFile(f);
+            useEditorStore.setState({ terminalOpen: true });
+            run(f, contentOf(f), (doc, title) => previewDocument(doc, title));
+          },
+        })),
       ],
     },
     {
       label: 'Go',
       items: [
-        { label: 'Go to File...', shortcut: 'Ctrl+P', action: openCommandPalette },
-        { divider: true },
-        { label: 'Go to About', action: () => openFile('about.md') },
-        { label: 'Go to Projects', action: () => openFile('projects.json') },
-        { label: 'Go to Skills', action: () => openFile('skills.ts') },
-        { label: 'Go to Experience', action: () => openFile('experience.yaml') },
-        { label: 'Go to Contact', action: () => openFile('contact.jsx') },
-        { divider: true },
-        { label: 'Go Back', shortcut: 'Alt+←', action: () => window.history.back() },
-        { label: 'Go Forward', shortcut: 'Alt+→', action: () => window.history.forward() },
-      ],
-    },
-    {
-      label: 'Terminal',
-      items: [
-        { label: 'New Terminal', shortcut: 'Ctrl+Shift+`', action: toggleTerminal },
-        { label: 'Split Terminal', shortcut: 'Ctrl+Shift+5' },
-        { divider: true },
-        { label: 'Run npm dev', action: () => openSimpleBrowser('/portfolio') },
-        { label: 'Run Build Task...', shortcut: 'Ctrl+Shift+B' },
-        { divider: true },
-        { label: 'Show Terminal', action: () => useEditorStore.setState({ terminalOpen: true }) },
-        { label: 'Hide Terminal', action: () => useEditorStore.setState({ terminalOpen: false }) },
+        { label: 'README.md', action: () => openFile('README.md') },
+        { label: 'about.md', action: () => openFile('about.md') },
+        { label: 'stack.md', action: () => openFile('stack.md') },
+        { label: 'products.json', action: () => openFile('products.json') },
+        { label: 'projects.json', action: () => openFile('projects.json') },
+        { label: 'contact.ts', action: () => openFile('contact.ts') },
       ],
     },
     {
       label: 'Help',
       items: [
-        { label: 'Welcome', action: () => openFile('README.md') },
-        { label: 'Documentation', action: () => window.open('https://github.com/anubhav-n-mishra', '_blank') },
-        { label: 'Show All Commands', shortcut: 'Ctrl+Shift+P', action: openCommandPalette },
+        { label: 'Open the classic portfolio', action: () => openSimpleBrowser('/portfolio') },
+        { label: 'Ask the assistant', action: () => showSidebarPanel('ai') },
         { divider: true },
-        { label: 'View on GitHub', action: () => window.open('https://github.com/anubhav-n-mishra', '_blank') },
-        { label: 'View LinkedIn', action: () => window.open('https://linkedin.com/in/anubhav-mishra0', '_blank') },
-        { divider: true },
-        { label: 'About', action: () => alert('Anubhav Mishra Portfolio\nBuilt with Next.js, TypeScript & Tailwind CSS\n\nVersion 1.0.0') },
+        { label: 'GitHub profile', action: () => window.open(contact.github, '_blank', 'noopener,noreferrer') },
+        { label: 'LinkedIn profile', action: () => window.open(contact.linkedin, '_blank', 'noopener,noreferrer') },
+        { label: 'Email me', action: () => window.open(`mailto:${contact.email}`) },
       ],
     },
   ];
 
   return (
     <>
-      {/* Hidden file inputs */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={handleFileUpload}
-        multiple
-        accept=".js,.jsx,.ts,.tsx,.json,.md,.css,.html,.py,.sql,.yaml,.yml,.txt"
-      />
-      <input
-        type="file"
-        ref={folderInputRef}
-        className="hidden"
-        onChange={handleFolderUpload}
-        multiple
-      />
-
       <header
-        className="flex items-center h-[35px] select-none relative"
-        style={{
-          backgroundColor: 'var(--bg-titlebar)',
-          borderBottom: '1px solid var(--border-color)'
-        }}
+        className="flex items-center h-[35px] select-none relative shrink-0"
+        style={{ background: 'var(--bg-titlebar)', borderBottom: '1px solid var(--border-color)' }}
       >
-        {/* Left - Logo & Menu */}
-        <div className="flex items-center h-full">
-          {/* VS Code Logo */}
-          <div className="w-12 h-full flex items-center justify-center" style={{ color: 'var(--accent-primary)' }}>
-            <Code2 size={18} />
-          </div>
+        <div className="w-12 h-full flex items-center justify-center shrink-0" style={{ color: 'var(--accent-primary)' }}>
+          <Code2 size={18} />
+        </div>
 
-          {/* Mobile Menu Button */}
+        <button
+          className="md:hidden p-2 rounded hover:bg-white/10"
+          onClick={() => setMobileOpen((o) => !o)}
+          aria-label="Menu"
+        >
+          {mobileOpen ? <X size={16} style={{ color: 'var(--text-primary)' }} /> : <Menu size={16} style={{ color: 'var(--text-primary)' }} />}
+        </button>
+
+        <nav className="hidden md:flex items-center h-full">
+          {menus.map((menu) => (
+            <MenuButton key={menu.label} menu={menu} openMenu={openMenu} setOpenMenu={setOpenMenu} />
+          ))}
+        </nav>
+
+        <div className="flex-1 flex justify-center px-2 sm:px-4 min-w-0">
           <button
-            className="md:hidden p-2 hover:bg-white/10 rounded"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={() => openCommandPalette('files')}
+            className="flex items-center justify-center w-full max-w-[420px] h-[26px] px-3 rounded hover:brightness-125 min-w-0"
+            style={{ background: 'var(--bg-tertiary)' }}
+            title="Search files (Ctrl+P)"
           >
-            <Menu size={16} style={{ color: 'var(--text-primary)' }} />
+            <Search size={13} className="mr-2 shrink-0" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-[13px] truncate" style={{ color: 'var(--text-muted)' }}>
+              anubhav-portfolio
+            </span>
           </button>
-
-          {/* Menu Bar */}
-          <nav
-            className="hidden md:flex items-center h-full"
-            style={{ display: 'flex', gap: '0px' }}
-          >
-            {menuItems.map((menu) => (
-              <MenuItem key={menu.label} {...menu} />
-            ))}
-          </nav>
-
-          {/* Navigation Arrows */}
-          <div className="hidden sm:flex items-center ml-2 gap-0.5">
-            <button
-              onClick={() => window.history.back()}
-              className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              <ArrowLeft size={16} />
-            </button>
-            <button
-              onClick={() => window.history.forward()}
-              className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              <ArrowRight size={16} />
-            </button>
-          </div>
         </div>
 
-        {/* Center - Search Bar */}
-        <div className="flex-1 flex justify-center px-4">
-          <div
-            onClick={openCommandPalette}
-            className="flex items-center w-full max-w-[400px] h-[26px] px-3 rounded cursor-pointer hover:brightness-110"
-            style={{ backgroundColor: 'var(--bg-tertiary)' }}
+        <div className="flex items-center h-full ml-auto shrink-0 pr-1">
+          <button
+            onClick={runActive}
+            title={running ? 'Stop' : 'Run active file (Ctrl+Enter)'}
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10"
+            style={{ color: running ? 'var(--error)' : 'var(--success)' }}
           >
-            <Search size={14} className="mr-2" style={{ color: 'var(--text-muted)' }} />
-            <span className="text-[13px]" style={{ color: 'var(--text-muted)' }}>anubhav-portfolio</span>
-          </div>
-        </div>
-
-        {/* Right - Actions & Window Controls */}
-        <div className="flex items-center h-full ml-auto shrink-0">
+            <Play size={15} fill="currentColor" />
+          </button>
           <button
             onClick={toggleTheme}
-            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded"
-            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Theme`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10"
             style={{ color: 'var(--text-muted)' }}
           >
-            {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+            {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
           </button>
-
           <button
             onClick={toggleSidebar}
-            className="hidden sm:flex w-8 h-8 items-center justify-center hover:bg-white/10 rounded"
-            title="Toggle Sidebar"
+            title="Toggle sidebar (Ctrl+B)"
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded hover:bg-white/10"
             style={{ color: 'var(--text-muted)' }}
           >
-            <PanelLeft size={16} />
+            <PanelLeft size={15} />
           </button>
-
           <button
             onClick={toggleTerminal}
-            className="hidden md:flex w-8 h-8 items-center justify-center hover:bg-white/10 rounded"
-            title="Toggle Terminal"
+            title="Toggle terminal (Ctrl+`)"
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded hover:bg-white/10"
             style={{ color: 'var(--text-muted)' }}
           >
-            <SquareSplitHorizontal size={16} />
-          </button>
-
-          <button
-            className="hidden lg:flex w-8 h-8 items-center justify-center hover:bg-white/10 rounded"
-            title="Toggle Secondary Sidebar"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <PanelRight size={16} />
-          </button>
-
-          <button
-            className="hidden lg:flex w-8 h-8 items-center justify-center hover:bg-white/10 rounded"
-            title="Customize Layout"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <LayoutGrid size={16} />
-          </button>
-
-          {/* Separator */}
-          <div className="hidden sm:block w-px h-4 mx-1" style={{ backgroundColor: 'var(--border-color)' }} />
-
-          {/* Window Controls */}
-          <button className="w-[46px] h-full flex items-center justify-center hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
-            <Minus size={16} />
-          </button>
-          <button className="hidden sm:flex w-[46px] h-full items-center justify-center hover:bg-white/10" style={{ color: 'var(--text-secondary)' }}>
-            <Square size={12} />
-          </button>
-          <button className="w-[46px] h-full flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors" style={{ color: 'var(--text-secondary)' }}>
-            <X size={16} />
+            <PanelBottom size={15} />
           </button>
         </div>
 
-        {/* Mobile Menu Dropdown */}
-        {mobileMenuOpen && (
+        {mobileOpen && (
           <div
-            className="absolute top-full left-0 right-0 shadow-lg z-50 md:hidden max-h-[70vh] overflow-y-auto"
-            style={{ backgroundColor: 'var(--bg-dropdown)', borderBottom: '1px solid var(--border-color)' }}
+            className="absolute top-full left-0 right-0 shadow-xl z-[200] md:hidden max-h-[70vh] overflow-y-auto"
+            style={{ background: 'var(--bg-dropdown)', borderBottom: '1px solid var(--border-color)' }}
           >
-            {menuItems.map((menu) => (
+            {menus.map((menu) => (
               <div key={menu.label} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                <div className="px-4 py-2 text-[13px] font-semibold" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}>
+                <div
+                  className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                >
                   {menu.label}
                 </div>
-                {menu.items.filter(item => !item.divider).map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      item.action?.();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between px-4 py-2 text-[13px] hover:bg-white/10"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    <span>{item.label}</span>
-                    {item.shortcut && (
-                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{item.shortcut}</span>
-                    )}
-                  </button>
-                ))}
+                {menu.items
+                  .filter((i) => !i.divider)
+                  .map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        item.action?.();
+                        setMobileOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2 text-[13px] hover:bg-white/10"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      <span>{item.label}</span>
+                      {item.shortcut && (
+                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          {item.shortcut}
+                        </span>
+                      )}
+                    </button>
+                  ))}
               </div>
             ))}
           </div>

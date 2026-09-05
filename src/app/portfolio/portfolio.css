@@ -1461,3 +1461,45 @@ html:has(.portfolio-app) {
     grid-template-columns: 1fr;
   }
 }
+/* Work section: products and engineering are separate, fully visible grids
+   rather than one long carousel. */
+.work-group-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin: 2.5rem 0 1.25rem;
+}
+
+.work-group-title:first-of-type {
+    margin-top: 1rem;
+}
+
+.project-note {
+    font-size: 0.8rem;
+    font-weight: 400;
+    opacity: 0.6;
+}
+
+.project-link-muted {
+    opacity: 0.55;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* Skill chips carry their own accent colour instead of a remote logo. */
+.skill-card .skill-mark {
+    display: block;
+    width: 34px;
+    height: 4px;
+    border-radius: 999px;
+    margin: 0 auto 0.85rem;
+    background: var(--skill-accent, #7c8595);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--skill-accent, #7c8595) 55%, transparent);
+}
+
+.skill-card:hover .skill-mark {
+    width: 46px;
+    transition: width 0.2s ease;
+}

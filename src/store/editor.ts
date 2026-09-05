@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { fileContents, getFileContent } from '@/data/files';
 
 export interface FileTab {
   id: string;
@@ -17,35 +18,113 @@ export interface TreeNode {
   isOpen?: boolean;
 }
 
+export type SidebarPanel =
+  | 'explorer'
+  | 'search'
+  | 'git'
+  | 'extensions'
+  | 'ai'
+  | 'account'
+  | 'settings';
+
+export type PaletteMode = 'commands' | 'files';
+
+export interface ExtensionDef {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  publisher: string;
+}
+
+export const EXTENSIONS: ExtensionDef[] = [
+  {
+    id: 'resume',
+    name: 'Resume Download',
+    description: 'Adds the `resume` terminal command and the download action.',
+    icon: '📄',
+    publisher: 'anubhav-n-mishra',
+  },
+  {
+    id: 'code-runner',
+    name: 'Code Runner',
+    description: 'Runs the open file — JS, TS, Python, C, C++ and more.',
+    icon: '▶️',
+    publisher: 'anubhav-n-mishra',
+  },
+  {
+    id: 'github',
+    name: 'GitHub Integration',
+    description: 'Shows repository activity in the Source Control panel.',
+    icon: '🐙',
+    publisher: 'anubhav-n-mishra',
+  },
+  {
+    id: 'theme',
+    name: 'Theme Switcher',
+    description: 'Dark and light variants of the editor theme.',
+    icon: '🎨',
+    publisher: 'anubhav-n-mishra',
+  },
+  {
+    id: 'assistant',
+    name: 'Portfolio Assistant',
+    description: 'Answers questions about the work, entirely offline.',
+    icon: '🤖',
+    publisher: 'anubhav-n-mishra',
+  },
+  {
+    id: 'browser',
+    name: 'Simple Browser',
+    description: 'Renders HTML and live sites in a side pane.',
+    icon: '🌐',
+    publisher: 'anubhav-n-mishra',
+  },
+];
+
 interface EditorState {
   tabs: FileTab[];
   activeFile: string | null;
-  sidebarPanel: 'explorer' | 'search' | 'git' | 'extensions' | 'ai' | 'account';
+  sidebarPanel: SidebarPanel;
   sidebarOpen: boolean;
   terminalOpen: boolean;
   terminalHeight: number;
   fileTree: TreeNode[];
   commandPaletteOpen: boolean;
+  commandPaletteMode: PaletteMode;
   simpleBrowserOpen: boolean;
   simpleBrowserUrl: string;
+  /** Set instead of a URL when previewing HTML written in the editor. */
+  simpleBrowserDoc: string | null;
+  simpleBrowserTitle: string;
   userFiles: Record<string, string>;
-  
-  // Actions
+  installedExtensions: string[];
+
   openFile: (filename: string) => void;
   closeFile: (filename: string) => void;
+  closeAllFiles: () => void;
   setActiveFile: (filename: string) => void;
-  setSidebarPanel: (panel: EditorState['sidebarPanel']) => void;
+  setSidebarPanel: (panel: SidebarPanel) => void;
+  showSidebarPanel: (panel: SidebarPanel) => void;
   toggleSidebar: () => void;
   toggleTerminal: () => void;
+  setTerminalOpen: (open: boolean) => void;
   setTerminalHeight: (height: number) => void;
   toggleFolder: (path: string) => void;
-  openCommandPalette: () => void;
+  collapseAllFolders: () => void;
+  openCommandPalette: (mode?: PaletteMode) => void;
   closeCommandPalette: () => void;
   openSimpleBrowser: (url: string) => void;
+  previewDocument: (doc: string, title: string) => void;
   closeSimpleBrowser: () => void;
-  createFile: (path: string, name: string) => void;
+  createFile: (parentPath: string, name: string, content?: string) => void;
+  createFolder: (parentPath: string, name: string) => void;
   updateFileContent: (filename: string, content: string) => void;
-  createFolder: (path: string, name: string) => void;
+  saveFile: (filename: string) => void;
+  /** Current text of a file: the visitor's edits if any, otherwise the shipped content. */
+  contentOf: (filename: string) => string;
+  /** Every filename the explorer knows about, for quick-open and search. */
+  allFilenames: () => string[];
 }
 
 const initialFileTree: TreeNode[] = [
@@ -57,239 +136,299 @@ const initialFileTree: TreeNode[] = [
     isOpen: true,
     children: [
       {
-        id: 'src',
-        name: 'src',
+        id: 'about-dir',
+        name: 'about',
         type: 'folder',
-        path: '/src',
+        path: '/about',
         isOpen: true,
         children: [
-          {
-            id: 'app',
-            name: 'app',
-            type: 'folder',
-            path: '/src/app',
-            isOpen: true,
-            children: [
-              { id: 'page', name: 'page.tsx', type: 'file', path: '/src/app/page.tsx' },
-              { id: 'layout', name: 'layout.tsx', type: 'file', path: '/src/app/layout.tsx' },
-              { id: 'globals', name: 'globals.css', type: 'file', path: '/src/app/globals.css' },
-            ],
-          },
-          {
-            id: 'components',
-            name: 'components',
-            type: 'folder',
-            path: '/src/components',
-            isOpen: true,
-            children: [
-              { id: 'ide-layout', name: 'IDELayout.tsx', type: 'file', path: '/src/components/IDELayout.tsx' },
-              { id: 'titlebar', name: 'TitleBar.tsx', type: 'file', path: '/src/components/TitleBar.tsx' },
-              { id: 'activitybar', name: 'ActivityBar.tsx', type: 'file', path: '/src/components/ActivityBar.tsx' },
-              { id: 'sidebar', name: 'Sidebar.tsx', type: 'file', path: '/src/components/Sidebar.tsx' },
-              { id: 'editor', name: 'Editor.tsx', type: 'file', path: '/src/components/Editor.tsx' },
-              { id: 'terminal', name: 'Terminal.tsx', type: 'file', path: '/src/components/Terminal.tsx' },
-              { id: 'statusbar', name: 'StatusBar.tsx', type: 'file', path: '/src/components/StatusBar.tsx' },
-            ],
-          },
-          {
-            id: 'store',
-            name: 'store',
-            type: 'folder',
-            path: '/src/store',
-            isOpen: false,
-            children: [
-              { id: 'editor-store', name: 'editor.ts', type: 'file', path: '/src/store/editor.ts' },
-              { id: 'theme-store', name: 'theme.ts', type: 'file', path: '/src/store/theme.ts' },
-            ],
-          },
-          {
-            id: 'data',
-            name: 'data',
-            type: 'folder',
-            path: '/src/data',
-            isOpen: false,
-            children: [
-              { id: 'portfolio-data', name: 'portfolio.ts', type: 'file', path: '/src/data/portfolio.ts' },
-            ],
-          },
+          { id: 'f-about', name: 'about.md', type: 'file', path: '/about/about.md' },
+          { id: 'f-stack', name: 'stack.md', type: 'file', path: '/about/stack.md' },
         ],
       },
-      { id: 'readme', name: 'README.md', type: 'file', path: '/README.md' },
-      { id: 'package', name: 'package.json', type: 'file', path: '/package.json' },
-      { id: 'tsconfig', name: 'tsconfig.json', type: 'file', path: '/tsconfig.json' },
-      { id: 'gitignore', name: '.gitignore', type: 'file', path: '/.gitignore' },
+      {
+        id: 'work-dir',
+        name: 'work',
+        type: 'folder',
+        path: '/work',
+        isOpen: true,
+        children: [
+          { id: 'f-products', name: 'products.json', type: 'file', path: '/work/products.json' },
+          { id: 'f-projects', name: 'projects.json', type: 'file', path: '/work/projects.json' },
+        ],
+      },
+      {
+        id: 'playground-dir',
+        name: 'playground',
+        type: 'folder',
+        path: '/playground',
+        isOpen: true,
+        children: [
+          { id: 'f-hello', name: 'hello.js', type: 'file', path: '/playground/hello.js' },
+          { id: 'f-rate', name: 'rate-limiter.ts', type: 'file', path: '/playground/rate-limiter.ts' },
+          { id: 'f-fizz', name: 'fizzbuzz.py', type: 'file', path: '/playground/fizzbuzz.py' },
+          { id: 'f-analysis', name: 'analysis.py', type: 'file', path: '/playground/analysis.py' },
+          { id: 'f-twosum', name: 'two-sum.cpp', type: 'file', path: '/playground/two-sum.cpp' },
+          { id: 'f-sched', name: 'scheduler.c', type: 'file', path: '/playground/scheduler.c' },
+          { id: 'f-demo', name: 'demo.html', type: 'file', path: '/playground/demo.html' },
+        ],
+      },
+      { id: 'f-readme', name: 'README.md', type: 'file', path: '/README.md' },
+      { id: 'f-contact', name: 'contact.ts', type: 'file', path: '/contact.ts' },
     ],
   },
 ];
 
+function walk(nodes: TreeNode[], visit: (node: TreeNode) => void) {
+  for (const node of nodes) {
+    visit(node);
+    if (node.children) walk(node.children, visit);
+  }
+}
+
+function findPath(nodes: TreeNode[], filename: string): string {
+  let found = `/${filename}`;
+  walk(nodes, (node) => {
+    if (node.type === 'file' && node.name === filename) found = node.path;
+  });
+  return found;
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
-  tabs: [
-    { id: 'readme', name: 'README.md', path: '/README.md', isActive: true, isDirty: false },
-  ],
+  tabs: [{ id: 'f-readme', name: 'README.md', path: '/README.md', isActive: true, isDirty: false }],
   activeFile: 'README.md',
   sidebarPanel: 'explorer',
   sidebarOpen: true,
   terminalOpen: true,
-  terminalHeight: 200,
+  terminalHeight: 220,
   fileTree: initialFileTree,
   commandPaletteOpen: false,
+  commandPaletteMode: 'commands',
   simpleBrowserOpen: false,
   simpleBrowserUrl: '',
+  simpleBrowserDoc: null,
+  simpleBrowserTitle: '',
   userFiles: {},
-  
+  installedExtensions: ['code-runner', 'github', 'theme', 'assistant', 'browser'],
+
+  contentOf: (filename) => {
+    const { userFiles } = get();
+    return userFiles[filename] !== undefined ? userFiles[filename] : getFileContent(filename);
+  },
+
+  allFilenames: () => {
+    const names = new Set<string>();
+    walk(get().fileTree, (node) => {
+      if (node.type === 'file') names.add(node.name);
+    });
+    Object.keys(get().userFiles).forEach((n) => names.add(n));
+    Object.keys(fileContents).forEach((n) => names.add(n));
+    return [...names].sort();
+  },
+
   openFile: (filename) => {
-    const { tabs } = get();
-    const existingTab = tabs.find(t => t.name === filename);
-    
-    if (existingTab) {
+    const { tabs, fileTree } = get();
+    const existing = tabs.find((t) => t.name === filename);
+
+    if (existing) {
       set({
-        tabs: tabs.map(t => ({ ...t, isActive: t.name === filename })),
+        tabs: tabs.map((t) => ({ ...t, isActive: t.name === filename })),
         activeFile: filename,
       });
-    } else {
-      set({
-        tabs: [
-          ...tabs.map(t => ({ ...t, isActive: false })),
-          { 
-            id: filename.replace(/\./g, '-'), 
-            name: filename, 
-            path: `/${filename}`, 
-            isActive: true, 
-            isDirty: false 
-          },
-        ],
-        activeFile: filename,
-      });
+      return;
     }
-  },
-  
-  closeFile: (filename) => {
-    const { tabs, activeFile } = get();
-    const newTabs = tabs.filter(t => t.name !== filename);
-    
-    if (newTabs.length === 0) {
-      set({ tabs: [], activeFile: null });
-    } else if (activeFile === filename) {
-      const lastTab = newTabs[newTabs.length - 1];
-      set({
-        tabs: newTabs.map(t => ({ ...t, isActive: t.name === lastTab.name })),
-        activeFile: lastTab.name,
-      });
-    } else {
-      set({ tabs: newTabs });
-    }
-  },
-  
-  setActiveFile: (filename) => {
-    const { tabs } = get();
+
     set({
-      tabs: tabs.map(t => ({ ...t, isActive: t.name === filename })),
+      tabs: [
+        ...tabs.map((t) => ({ ...t, isActive: false })),
+        {
+          id: `tab-${filename}`,
+          name: filename,
+          path: findPath(fileTree, filename),
+          isActive: true,
+          isDirty: false,
+        },
+      ],
       activeFile: filename,
     });
   },
-  
+
+  closeFile: (filename) => {
+    const { tabs, activeFile } = get();
+    const index = tabs.findIndex((t) => t.name === filename);
+    const remaining = tabs.filter((t) => t.name !== filename);
+
+    if (remaining.length === 0) {
+      set({ tabs: [], activeFile: null });
+      return;
+    }
+
+    if (activeFile !== filename) {
+      set({ tabs: remaining });
+      return;
+    }
+
+    // VS Code activates the neighbour to the right, falling back to the left.
+    const next = remaining[Math.min(index, remaining.length - 1)];
+    set({
+      tabs: remaining.map((t) => ({ ...t, isActive: t.name === next.name })),
+      activeFile: next.name,
+    });
+  },
+
+  closeAllFiles: () => set({ tabs: [], activeFile: null }),
+
+  setActiveFile: (filename) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => ({ ...t, isActive: t.name === filename })),
+      activeFile: filename,
+    })),
+
+  // Clicking the active icon in the activity bar collapses the sidebar, as in VS Code.
   setSidebarPanel: (panel) => {
     const { sidebarPanel, sidebarOpen } = get();
-    if (sidebarPanel === panel && sidebarOpen) {
-      set({ sidebarOpen: false });
-    } else {
-      set({ sidebarPanel: panel, sidebarOpen: true });
-    }
+    if (sidebarPanel === panel && sidebarOpen) set({ sidebarOpen: false });
+    else set({ sidebarPanel: panel, sidebarOpen: true });
   },
-  
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  
-  toggleTerminal: () => set((state) => ({ terminalOpen: !state.terminalOpen })),
-  
-  setTerminalHeight: (height) => set({ terminalHeight: height }),
-  
+
+  showSidebarPanel: (panel) => set({ sidebarPanel: panel, sidebarOpen: true }),
+
+  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
+  setTerminalOpen: (terminalOpen) => set({ terminalOpen }),
+  setTerminalHeight: (terminalHeight) => set({ terminalHeight }),
+
   toggleFolder: (path) => {
-    const toggleInTree = (nodes: TreeNode[]): TreeNode[] => {
-      return nodes.map(node => {
+    const toggle = (nodes: TreeNode[]): TreeNode[] =>
+      nodes.map((node) => {
         if (node.path === path && node.type === 'folder') {
           return { ...node, isOpen: !node.isOpen };
         }
-        if (node.children) {
-          return { ...node, children: toggleInTree(node.children) };
-        }
-        return node;
+        return node.children ? { ...node, children: toggle(node.children) } : node;
       });
-    };
-    
-    set((state) => ({ fileTree: toggleInTree(state.fileTree) }));
+    set((state) => ({ fileTree: toggle(state.fileTree) }));
   },
-  
-  openCommandPalette: () => set({ commandPaletteOpen: true }),
-  
+
+  collapseAllFolders: () => {
+    const collapse = (nodes: TreeNode[], depth = 0): TreeNode[] =>
+      nodes.map((node) =>
+        node.type === 'folder'
+          ? {
+              ...node,
+              // Keep the project root expanded; collapse everything inside it.
+              isOpen: depth === 0 ? node.isOpen : false,
+              children: node.children ? collapse(node.children, depth + 1) : undefined,
+            }
+          : node
+      );
+    set((state) => ({ fileTree: collapse(state.fileTree) }));
+  },
+
+  openCommandPalette: (mode = 'commands') =>
+    set({ commandPaletteOpen: true, commandPaletteMode: mode }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),
-  
-  openSimpleBrowser: (url) => set({ simpleBrowserOpen: true, simpleBrowserUrl: url }),
-  
-  closeSimpleBrowser: () => set({ simpleBrowserOpen: false, simpleBrowserUrl: '' }),
-  
-  createFile: (path, name) => {
-    const addToTree = (nodes: TreeNode[]): TreeNode[] => {
-      return nodes.map(node => {
-        if (node.path === path && node.type === 'folder') {
-          const newFile: TreeNode = {
-            id: `${Date.now()}-${name}`,
-            name,
-            type: 'file',
-            path: `${path}/${name}`,
-          };
-          return { 
-            ...node, 
+
+  openSimpleBrowser: (url) =>
+    set({
+      simpleBrowserOpen: true,
+      simpleBrowserUrl: url,
+      simpleBrowserDoc: null,
+      simpleBrowserTitle: url,
+    }),
+
+  previewDocument: (doc, title) =>
+    set({
+      simpleBrowserOpen: true,
+      simpleBrowserDoc: doc,
+      simpleBrowserUrl: '',
+      simpleBrowserTitle: title,
+    }),
+
+  closeSimpleBrowser: () =>
+    set({ simpleBrowserOpen: false, simpleBrowserUrl: '', simpleBrowserDoc: null }),
+
+  createFile: (parentPath, name, content = '') => {
+    const add = (nodes: TreeNode[]): TreeNode[] =>
+      nodes.map((node) => {
+        if (node.path === parentPath && node.type === 'folder') {
+          if (node.children?.some((c) => c.name === name)) return { ...node, isOpen: true };
+          return {
+            ...node,
             isOpen: true,
-            children: [...(node.children || []), newFile] 
+            children: [
+              ...(node.children ?? []),
+              {
+                id: `user-${name}-${Date.now()}`,
+                name,
+                type: 'file' as const,
+                path: `${parentPath === '/' ? '' : parentPath}/${name}`,
+              },
+            ],
           };
         }
-        if (node.children) {
-          return { ...node, children: addToTree(node.children) };
-        }
-        return node;
+        return node.children ? { ...node, children: add(node.children) } : node;
       });
-    };
-    
-    set((state) => ({ 
-      fileTree: addToTree(state.fileTree),
-      userFiles: { ...state.userFiles, [name]: '' }
+
+    set((state) => ({
+      fileTree: add(state.fileTree),
+      userFiles: { ...state.userFiles, [name]: content },
     }));
   },
-  
-  updateFileContent: (filename, content) => {
+
+  createFolder: (parentPath, name) => {
+    const add = (nodes: TreeNode[]): TreeNode[] =>
+      nodes.map((node) => {
+        if (node.path === parentPath && node.type === 'folder') {
+          if (node.children?.some((c) => c.name === name)) return { ...node, isOpen: true };
+          return {
+            ...node,
+            isOpen: true,
+            children: [
+              ...(node.children ?? []),
+              {
+                id: `dir-${name}-${Date.now()}`,
+                name,
+                type: 'folder' as const,
+                path: `${parentPath === '/' ? '' : parentPath}/${name}`,
+                isOpen: true,
+                children: [],
+              },
+            ],
+          };
+        }
+        return node.children ? { ...node, children: add(node.children) } : node;
+      });
+
+    set((state) => ({ fileTree: add(state.fileTree) }));
+  },
+
+  updateFileContent: (filename, content) =>
     set((state) => ({
       userFiles: { ...state.userFiles, [filename]: content },
-      tabs: state.tabs.map(t => 
-        t.name === filename ? { ...t, isDirty: true } : t
-      )
-    }));
-  },
-  
-  createFolder: (path, name) => {
-    const addToTree = (nodes: TreeNode[]): TreeNode[] => {
-      return nodes.map(node => {
-        if (node.path === path && node.type === 'folder') {
-          const newFolder: TreeNode = {
-            id: `${Date.now()}-${name}`,
-            name,
-            type: 'folder',
-            path: `${path}/${name}`,
-            isOpen: false,
-            children: [],
-          };
-          return { 
-            ...node, 
-            isOpen: true,
-            children: [...(node.children || []), newFolder] 
-          };
-        }
-        if (node.children) {
-          return { ...node, children: addToTree(node.children) };
-        }
-        return node;
-      });
-    };
-    
-    set((state) => ({ fileTree: addToTree(state.fileTree) }));
-  },
+      // Dirty means "differs from what shipped", so undoing an edit clears the marker.
+      tabs: state.tabs.map((t) =>
+        t.name === filename ? { ...t, isDirty: content !== getFileContent(filename) } : t
+      ),
+    })),
+
+  saveFile: (filename) =>
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.name === filename ? { ...t, isDirty: false } : t)),
+    })),
 }));
+
+/** Extension gating, used by the terminal and the resume actions. */
+export const hasExtension = (id: string): boolean =>
+  useEditorStore.getState().installedExtensions.includes(id);
+
+export const installExtension = (id: string) =>
+  useEditorStore.setState((state) =>
+    state.installedExtensions.includes(id)
+      ? state
+      : { installedExtensions: [...state.installedExtensions, id] }
+  );
+
+export const uninstallExtension = (id: string) =>
+  useEditorStore.setState((state) => ({
+    installedExtensions: state.installedExtensions.filter((e) => e !== id),
+  }));

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useThemeStore } from '@/store/theme';
 import { useEditorStore } from '@/store/editor';
+import { useRunnerStore } from '@/store/runner';
 import TitleBar from '@/components/TitleBar';
 import ActivityBar from '@/components/ActivityBar';
 import Sidebar from '@/components/Sidebar';
@@ -12,111 +13,119 @@ import StatusBar from '@/components/StatusBar';
 import CommandPalette from '@/components/CommandPalette';
 import SimpleBrowser from '@/components/SimpleBrowser';
 import { cn } from '@/lib/utils';
+import { useIsMobile, useMounted } from '@/lib/hooks';
 
 export default function IDELayout() {
-  const { theme, antiGravity, animations, toggleTheme } = useThemeStore();
-  const { toggleSidebar, toggleTerminal, sidebarOpen, simpleBrowserOpen } = useEditorStore();
-  const [mounted, setMounted] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const { theme, animations } = useThemeStore();
+  const {
+    toggleSidebar, toggleTerminal, sidebarOpen, simpleBrowserOpen,
+    openCommandPalette, closeCommandPalette, commandPaletteOpen,
+    showSidebarPanel, activeFile, contentOf, previewDocument, saveFile,
+  } = useEditorStore();
+  const { run, stop, running } = useRunnerStore();
+
+  const mounted = useMounted();
+  const isMobile = useIsMobile();
+  const [booting, setBooting] = useState(true);
 
   useEffect(() => {
-    setMounted(true);
-
-    // Force scroll to top and lock body scroll for IDE experience
     window.scrollTo(0, 0);
-
-    // Aggressive cleanup of portfolio contamination
-    document.documentElement.removeAttribute('data-theme');
-    document.body.removeAttribute('data-theme');
-
-    // Remove portfolio-specific classes
-    const bodyClasses = document.body.className.split(' ').filter(cls => !cls.includes('portfolio'));
-    document.body.className = bodyClasses.join(' ');
-
-    // Set IDE-specific attribute for CSS isolation
     document.body.setAttribute('data-ide-active', 'true');
-
-    // Lock scroll
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
-    // Force scroll restoration to manual
-    if ('scrollRestoration' in history) {
-      history.scrollRestoration = 'manual';
-    }
-
-    // Check screen size
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-
-    // Quick loading simulation
-    const timer = setTimeout(() => setIsLoading(false), 800);
+    const timer = window.setTimeout(() => setBooting(false), 650);
 
     return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', checkMobile);
-      // Clean up styles and attributes
+      window.clearTimeout(timer);
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
       document.body.removeAttribute('data-ide-active');
     };
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Command Palette: Ctrl+Shift+P or Ctrl+P
-      if ((e.ctrlKey && e.shiftKey && e.key === 'P') || (e.ctrlKey && e.key === 'p')) {
-        e.preventDefault();
-        setCommandPaletteOpen(true);
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+
+      if (e.key === 'Escape' && commandPaletteOpen) {
+        closeCommandPalette();
+        return;
       }
-      // Toggle Theme: Ctrl+K
-      if (e.ctrlKey && e.key === 'k') {
+      if (!mod) return;
+
+      const key = e.key.toLowerCase();
+
+      // Ctrl+Shift+P opens commands; Ctrl+P opens files. They used to be the same thing.
+      if (e.shiftKey && key === 'p') {
         e.preventDefault();
-        toggleTheme();
+        openCommandPalette('commands');
+        return;
       }
-      // Toggle Sidebar: Ctrl+B
-      if (e.ctrlKey && e.key === 'b') {
+      if (!e.shiftKey && key === 'p') {
         e.preventDefault();
-        toggleSidebar();
+        openCommandPalette('files');
+        return;
       }
-      // Toggle Terminal: Ctrl+`
-      if (e.ctrlKey && e.key === '`') {
+      if (e.shiftKey && key === 'e') { e.preventDefault(); showSidebarPanel('explorer'); return; }
+      if (e.shiftKey && key === 'f') { e.preventDefault(); showSidebarPanel('search'); return; }
+      if (e.shiftKey && key === 'g') { e.preventDefault(); showSidebarPanel('git'); return; }
+      if (e.shiftKey && key === 'x') { e.preventDefault(); showSidebarPanel('extensions'); return; }
+
+      if (key === 'b') { e.preventDefault(); toggleSidebar(); return; }
+      if (e.key === '`') { e.preventDefault(); toggleTerminal(); return; }
+      if (e.key === ',') { e.preventDefault(); showSidebarPanel('settings'); return; }
+
+      // Ctrl+Enter runs the active file from anywhere, not just inside the textarea.
+      if (e.key === 'Enter') {
         e.preventDefault();
-        toggleTerminal();
+        if (running) stop();
+        else if (activeFile) {
+          useEditorStore.setState({ terminalOpen: true });
+          run(activeFile, contentOf(activeFile), (doc, title) => previewDocument(doc, title));
+        }
+        return;
       }
-      // Close Command Palette: Escape
-      if (e.key === 'Escape') {
-        setCommandPaletteOpen(false);
+      if (key === 's') {
+        e.preventDefault();
+        if (activeFile) saveFile(activeFile);
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTheme, toggleSidebar, toggleTerminal]);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    commandPaletteOpen, closeCommandPalette, openCommandPalette, showSidebarPanel,
+    toggleSidebar, toggleTerminal, activeFile, contentOf, previewDocument, run, stop,
+    running, saveFile,
+  ]);
 
-  if (!mounted) {
-    return null;
-  }
+  if (!mounted) return null;
 
-  // Loading screen
-  if (isLoading) {
+  if (booting) {
     return (
-      <div className={cn("h-screen w-screen flex items-center justify-center", theme === 'light' && 'light')} style={{ background: 'var(--bg-primary)' }}>
+      <div
+        className={cn('h-screen w-screen flex items-center justify-center', theme === 'light' && 'light')}
+        style={{ background: 'var(--bg-primary)' }}
+      >
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 text-4xl mb-6" style={{ color: 'var(--accent-primary)' }}>
-            <span className="animate-pulse">{`{`}</span>
-            <div className="flex gap-1">
-              <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
-              <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
-              <span className="w-2 h-2 rounded-full loading-dot" style={{ background: 'var(--accent-primary)' }} />
-            </div>
-            <span className="animate-pulse">{`}`}</span>
+          <div className="flex items-center justify-center gap-2 text-4xl mb-5" style={{ color: 'var(--accent-primary)' }}>
+            <span>{'{'}</span>
+            <span className="flex gap-1">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-2 h-2 rounded-full loading-dot"
+                  style={{ background: 'var(--accent-primary)' }}
+                />
+              ))}
+            </span>
+            <span>{'}'}</span>
           </div>
-          <p className="font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>Initializing Anubhav&apos;s IDE...</p>
+          <p className="font-mono text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Starting the workspace...
+          </p>
         </div>
       </div>
     );
@@ -125,53 +134,42 @@ export default function IDELayout() {
   return (
     <div
       className={cn(
-        "h-screen w-screen flex flex-col overflow-hidden",
+        'h-screen w-screen flex flex-col overflow-hidden',
         theme === 'light' && 'light',
-        antiGravity && 'antigravity-enabled',
         animations && 'theme-transition'
       )}
       style={{ background: 'var(--bg-primary)' }}
     >
-      {/* Title Bar */}
       <TitleBar />
 
-      {/* Main Content */}
       <main className="flex-1 flex overflow-hidden min-h-0">
-        {/* Activity Bar */}
         <ActivityBar />
 
-        {/* Sidebar */}
         {sidebarOpen && (
           <>
             {isMobile && (
               <div
                 className="fixed inset-0 bg-black/50 z-30"
-                style={{ top: '35px', bottom: '22px' }}
+                style={{ top: 35, bottom: 22 }}
                 onClick={toggleSidebar}
               />
             )}
-            <div className={cn(
-              isMobile && "fixed left-12 top-[35px] bottom-[22px] z-40 shadow-xl"
-            )}>
+            <div className={cn(isMobile && 'fixed left-12 top-[35px] bottom-[22px] z-40 shadow-2xl')}>
               <Sidebar />
             </div>
           </>
         )}
 
-        {/* Editor + Terminal Area */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           <div className="flex-1 flex min-h-0 flex-col md:flex-row">
-            <div className={cn(
-              "flex-1 flex flex-col min-w-0",
-              simpleBrowserOpen && !isMobile && "md:w-1/2"
-            )}>
+            <div className={cn('flex flex-col min-w-0 min-h-0', simpleBrowserOpen ? 'md:w-1/2 flex-1' : 'flex-1')}>
               <Editor />
             </div>
             {simpleBrowserOpen && (
-              <div className={cn(
-                "border-t md:border-t-0 md:border-l",
-                isMobile ? "h-1/2" : "w-1/2"
-              )} style={{ borderColor: 'var(--border-primary)' }}>
+              <div
+                className={cn('min-h-0', isMobile ? 'h-1/2 border-t' : 'w-1/2 border-l')}
+                style={{ borderColor: 'var(--border-color)' }}
+              >
                 <SimpleBrowser />
               </div>
             )}
@@ -180,14 +178,8 @@ export default function IDELayout() {
         </div>
       </main>
 
-      {/* Status Bar */}
       <StatusBar />
-
-      {/* Command Palette Modal */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-      />
+      <CommandPalette />
     </div>
   );
 }
